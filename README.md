@@ -3,7 +3,7 @@
 > **⚠️ DEPRECATED (사용 중단)**
 >
 > 이 저장소(`heterarchy-gateway`)는 **Deprecated** 처리되어 더 이상 유지보수하거나 사용하지 않습니다.
-> 도메인 상태·권한·영속성을 소유하는 `heterarchy-orchestration`과 `heterarchy-forge`는 각각 독립된 순수 Rust 헤드리스 백엔드 데몬으로 운영되며, 기존 Chrome 브라우저 컴패니언 및 Python BFF 게이트웨이 계층은 아키텍처 단순화에 따라 폐기되었습니다.
+> 도메인 상태·권한·영속성을 소유하는 `heterarchy-orchestration`과 `heterarchy-forge`는 각각 독립된 순수 Rust 헤드리스 백엔드 데몬으로 운영되며, 기존 Chrome 브라우저 컴패니언, SwiftUI 데스크톱 GUI 및 Python BFF 게이트웨이 계층은 아키텍처 단순화에 따라 폐기되었습니다.
 
 ---
 
@@ -11,7 +11,7 @@ Forge와 Orchestration의 공개 backend 계약을 HTTP/MCP 경계에서 전달�
 
 Python은 **CPython 3.14.7 free-threaded**, DI는 **Dishka 1.10.1**입니다. 최신 사용자 요청에 따라 일반 Python 정책을 갱신했고, 잠긴 의존성 import 및 실제 앱 startup/shutdown 뒤 GIL disabled를 확인합니다. dependency-injector와 orjson은 제거했고 JSON은 검증된 typed codec을 사용합니다.
 
-Python 환경·설치·실행은 **uv만** 사용합니다. pip, python -m pip, uv pip는 사용하지 않습니다. 정확한 interpreter는 .python-version, 재현 가능한 Python dependency graph는 uv.lock이 소유합니다. 데스크톱 GUI는 dependency 없는 SwiftUI/AppKit 앱이며 `native/GatewayDesktop`에서 빌드합니다.
+Python 환경·설치·실행은 **uv만** 사용합니다. pip, python -m pip, uv pip는 사용하지 않습니다. 정확한 interpreter는 .python-version, 재현 가능한 Python dependency graph는 uv.lock이 소유합니다.
 
 설정은 [shared/settings_modules](app/shared/settings_modules)에 나눕니다. `base_settings.py`는 공통 pydantic-settings 정책, `orchestration_settings.py`와 `forge_settings.py`는 각 backend origin·고정 API 경로, `gateway_settings.py`는 모듈 조합과 worker 자원 정책을 관리합니다. 서버 origin은 `GATEWAY_ORCHESTRATION_BASE_URL`, `GATEWAY_FORGE_BASE_URL`로 지정합니다. root가 설정을 호출기에 전달하며 source와 다른 경로는 거부합니다.
 
@@ -19,15 +19,14 @@ Python 환경·설치·실행은 **uv만** 사용합니다. pip, python -m pip, 
 uv python install 3.14.7t
 make sync
 make ci
-make native-app
 make run
 ```
 
 CI의 공통 진입점은 `make ci`입니다. [.github/workflows/ci.yml](.github/workflows/ci.yml)은 trusted main push와 main 수동 실행에서 같은 실제 검사들을 실행합니다. 공개 저장소에 비공개 하네스를 넣지 않으므로 별도의 CI 하네스 공급이 필요합니다. 현재 원격 workflow·secrets·실행 상태와 설정 전제는 [CI 안내](docs/ci.md)에 구분했습니다. 로컬 검사 통과를 원격 CI 성공으로 보고하지 않습니다.
 
-`make ci`는 Swift contract/build 검사를 실행한 뒤 Python runtime·typing·회귀 검사를 이어 실행합니다. 로컬 검증을 실제 backend 인증 연동으로 확대하지 않습니다.
+`make ci`는 Python runtime·typing·회귀 검사를 실행합니다. 로컬 검증을 실제 backend 인증 연동으로 확대하지 않습니다.
 
-기존 React/Vite/Tauri control panel과 Chrome browser companion은 제거했습니다. Swift 앱은 Workspace 등록, 실제 Workspace 수, 선택적 기존 hostname 또는 빈 domain의 임시 tunnel 설정, MCP 7979 시작·중지·상태와 실제 pending consent를 제공합니다. 모든 명령은 Gateway의 `desktop` owner entry를 별도 process로 실행하며 직접 backend HTTP나 credential 입력을 사용하지 않습니다.
+기존 React/Vite/Tauri control panel, Chrome browser companion, SwiftUI 데스크톱 GUI는 모두 제거했습니다.
 
 GUI의 새 Workspace 등록은 폴더 이름을 사용한 ChatGPT Project 자동 생성·연결로 이어집니다. 기존 Workspace는 중복 생성하지 않습니다. [설정 및 복구 절차](docs/workspace-chatgpt-project.md)에 준비 조건을 정리했으며, Source 권한 설정, 실제 브라우저 접근, Project 안의 에이전트 실행은 각각 별도 증거로 확인합니다.
 
