@@ -1,11 +1,4 @@
-# [DEPRECATED] Heterarchy Gateway
-
-> **⚠️ DEPRECATED (사용 중단)**
->
-> 이 저장소(`heterarchy-gateway`)는 **Deprecated** 처리되어 더 이상 유지보수하거나 사용하지 않습니다.
-> 도메인 상태·권한·영속성을 소유하는 `heterarchy-orchestration`과 `heterarchy-forge`는 각각 독립된 순수 Rust 헤드리스 백엔드 데몬으로 운영되며, 기존 Chrome 브라우저 컴패니언, SwiftUI 데스크톱 GUI 및 Python BFF 게이트웨이 계층은 아키텍처 단순화에 따라 폐기되었습니다.
-
----
+# Heterarchy Gateway
 
 Forge와 Orchestration의 공개 backend 계약을 HTTP/MCP 경계에서 전달하는 BFF입니다. 도메인 상태·권한·영속성은 backend에 남습니다. 현재 전체 제품 이관을 완료하지 않았으며 [준비 상태 감사](docs/backend-readiness-2026-10-04.md)에 실제 source 계약과 blocker를 기록했습니다.
 
