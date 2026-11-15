@@ -1,0 +1,1 @@
+"""Shared filter type definitions."""
