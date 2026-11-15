@@ -1,0 +1,30 @@
+name: heterarchy-gateway
+
+services:
+  gateway:
+    build:
+      context: .
+      target: runtime
+    image: heterarchy-gateway:local
+    network_mode: host
+    user: "10001:10001"
+    init: true
+    read_only: true
+    volumes:
+      - ./module_setting_envs:/module_setting_envs:ro
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 2.0
+    stop_grace_period: 15s
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

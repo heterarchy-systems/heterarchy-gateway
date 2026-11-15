@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Private Alexandria harnesses and project agent materials.
+.agents/
+
+docs/
+.codex/
+.codegraph/
+
+# Feature settings contain local deployment values and credentials.
+module_setting_envs/*_settings.env
+.DS_Store

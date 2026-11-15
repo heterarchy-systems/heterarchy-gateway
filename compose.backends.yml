@@ -1,0 +1,6 @@
+# Optional existing loopback backend origins; no backend service is started here.
+services:
+  gateway:
+    environment:
+      GATEWAY_ORCHESTRATION_BASE_URL: ${GATEWAY_ORCHESTRATION_BASE_URL:?Provide the actual existing Orchestration loopback origin}
+      GATEWAY_FORGE_BASE_URL: ${GATEWAY_FORGE_BASE_URL:?Provide the actual existing Forge loopback origin}

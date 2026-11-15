@@ -1,0 +1,16 @@
+# Only declared build inputs may enter the Docker context.
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!uv.lock
+!.python-version
+!app/
+!app/**
+**/__pycache__/
+**/*.pyc
+**/node_modules/
+**/*.tsbuildinfo
+**/.env*
+.agents/
+.git/

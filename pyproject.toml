@@ -1,0 +1,77 @@
+[project]
+name = "heterarchy-gateway"
+version = "0.1.0"
+description = "Typed MCP and HTTP BFF for Heterarchy domain backends"
+requires-python = "==3.14.7"
+dependencies = [
+    "blake3==1.0.10",
+    "dishka==1.10.1",
+    "fastapi>=0.142.2",
+    "httpx>=0.28.1",
+    "mcp>=2.3.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "uvicorn>=0.54.0",
+]
+
+[tool.uv]
+package = false
+python-preference = "only-managed"
+
+[tool.ruff]
+target-version = "py314"
+preview = false
+unsafe-fixes = false
+line-length = 100
+src = ["."]
+extend-exclude = [".agents", "node_modules", "frontend", "dist"]
+
+[tool.ruff.lint]
+# Correctness, explicit imports/types, async safety, and modern Python syntax.
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "ASYNC", "FAST", "S", "ANN", "RUF", "TID251"]
+# FastAPI Depends/Body/Query defaults are declarative framework metadata.
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Body", "fastapi.Query", "fastapi.Path", "fastapi.Header", "fastapi.Cookie", "fastapi.Security"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"builtins.getattr".msg = "Use explicit typed attributes or a typed adapter."
+"builtins.hasattr".msg = "Use an explicit typed contract instead of runtime attribute probing."
+"builtins.setattr".msg = "Use explicit typed assignments instead of dynamic attribute mutation."
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pyrefly]
+preset = "strict"
+python-version = "3.14.7"
+project-includes = ["app/**/*.py"]
+project-excludes = [".agents/**", ".venv/**", "node_modules/**"]
+search-path = [".", ".agents/python_bff_harness"]
+min-severity = "warn"
+
+[tool.pyrefly.errors]
+explicit-any = true
+untyped-function-decorator = true
+untyped-class-decorator = true
+implicit-import = true
+deprecated = true
+
+[dependency-groups]
+dev = [
+    "pyrefly>=1.3.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.9",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", ".agents/python_bff_harness"]
