@@ -46,3 +46,9 @@ make ci
 런타임·Ruff·Pyrefly·가드레일·전체 테스트를 실행합니다. 비공개 하네스 `.agents/python_bff_harness/`, 인접 Forge checkout, Orchestration `56d1d8d` checkout 및 Rust SSD 빌드 환경이 필요합니다.
 
 실제 3서비스 연동 테스트는 격리된 Forge·Orchestration·Gateway 프로세스와 로컬 worker·broker fixture를 사용합니다.
+
+## 이미지 발행
+
+`pyproject.toml`의 버전과 같은 `vX.Y.Z` Git 태그를 push하면 전체 CI와 컨테이너 실행 검증 후 `ghcr.io/heterarchy-systems/heterarchy-gateway:X.Y.Z`를 Private으로 발행합니다. `latest`도 같은 이미지를 가리킵니다. 발행한 숫자 버전은 재사용하지 않습니다.
+
+`main` push에서는 이미지 빌드·실행을 검증합니다. Private 이미지를 다운로드할 때는 GitHub Packages 읽기 권한으로 GHCR에 로그인합니다.
