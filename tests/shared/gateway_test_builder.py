@@ -6,9 +6,11 @@ from typing import Self
 import httpx
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import FastapiProvider
+from fastapi import Request
 from fastapi.testclient import TestClient
 
-from app.bootstrap import SharedProvider, create_app
+from app.bootstrap import SharedProvider, _forwarded_authorization, create_app
+from app.shared.api_calling_box.orchestration_event_calling import OrchestrationEventCalling
 from app.shared.settings_modules.forge_settings import ForgeSettings
 from app.shared.settings_modules.gateway_settings import (
     GatewayRuntimeSettings,
@@ -39,20 +41,54 @@ class _MockHttpProvider(Provider):
         ) as client:
             yield client
 
+    @provide(scope=Scope.REQUEST)
+    async def provide_orchestration_event_calling(
+        self,
+        orchestration_settings: OrchestrationSettings,
+        runtime_settings: GatewayRuntimeSettings,
+        request: Request,
+    ) -> AsyncIterator[OrchestrationEventCalling]:
+        """Bind the common mock transport to an isolated event client.
+
+        Args:
+            orchestration_settings: Source origin selected by the test builder.
+            runtime_settings: Shared test timeout settings.
+            request: The current request's isolated backend credential.
+        Return:
+            Mock-backed event caller with the normal request-owned cleanup.
+        """
+        caller = OrchestrationEventCalling(
+            base_url=orchestration_settings.orchestration_base_url,
+            authorization=_forwarded_authorization(request, "x-orchestration-authorization"),
+            timeout_seconds=runtime_settings.http_timeout_seconds,
+            transport=httpx.MockTransport(self._handler),
+        )
+        try:
+            yield caller
+        finally:
+            await caller.aclose()
+
 
 class GatewaySettingsBuilder:
     """Fluent builder producing validated module and composed Gateway settings."""
 
     def __init__(self) -> None:
+        """Initialize the builder with stable local test defaults.
+
+        Args:
+            None.
+        Return:
+            None.
+        """
         self._forge_base_url = "https://forge.example.test/api/v1"
-        self._orchestration_base_url = "https://orchestration.example.test/api/v1"
+        self._orchestration_base_url = "https://orchestration.example.test"
         self._failure_simulation_enabled = False
         self._http_timeout_seconds = 5.0
         self._max_connections = 20
         self._max_keepalive_connections = 5
         self._trace_capacity = 50
         self._host = "127.0.0.1"
-        self._port = 8799
+        self._port = 7979
 
     def with_forge_base_url(self, value: str) -> Self:
         self._forge_base_url = value

@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+import httpx
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -22,7 +23,7 @@ class OrchestrationSettings(BaseSettings):
 
     orchestration_base_url: Annotated[
         str,
-        Field(description="Base URL for the upstream Orchestration backend."),
+        Field(description="Orchestration backend origin without an API path."),
     ]
 
     @field_validator("orchestration_base_url")
@@ -35,5 +36,7 @@ class OrchestrationSettings(BaseSettings):
         Return:
             Validated normalized URL string.
         """
-        result = validate_backend_origin(value)
+        result = validate_backend_origin(value=value)
+        if httpx.URL(result).raw_path != b"/":
+            raise ValueError("Orchestration base URL must be an origin without an API path")
         return result

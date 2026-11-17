@@ -1,61 +1,120 @@
-"""Pydantic filter schema for combined forge-task resources."""
+"""Strict caller context and observation filters for Mixed Swarm overview."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
 from typing import Annotated
 
 from pydantic import Field
 
-from app.shared.filter_module.base_filter import BaseDateFilter
-from app.shared.ingredient_element.orchestration.orchestration_status_enum import (
-    OrchestrationStatus,
-)
+from app.shared.filter_module.base_filter import BaseFilter
+from app.shared.ingredient_element.forge.forge_enums import SettlementJournalStateEnum
+from app.shared.ingredient_element.gateway.mixed_enums import MixedOverviewQueryKeyEnum
+from app.shared.ingredient_element.orchestration.swarm_enums import SwarmRunStateEnum
+from app.shared.types.wire_scalar_types import WireUUID
+
+_I64_MIN = -(1 << 63)
+_I64_MAX = (1 << 63) - 1
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class _MixedFilterTarget:
-    forge_name: str
-    task_status: OrchestrationStatus
+class _SwarmOverviewObservation:
+    run_state: SwarmRunStateEnum
+    has_applied_settlement: bool
 
 
-_STRING_PREDICATES: dict[str, Callable[[str, _MixedFilterTarget], bool]] = {
-    "forge_name": lambda criterion, target: criterion.casefold() in target.forge_name.casefold(),
-    "task_status": lambda criterion, target: criterion == target.task_status.value,
+def _matches_run_state(criterion: str, observation: _SwarmOverviewObservation) -> bool:
+    result = criterion == observation.run_state.value
+    return result
+
+
+def _matches_settled_only(criterion: str, observation: _SwarmOverviewObservation) -> bool:
+    result = criterion == "false" or observation.has_applied_settlement
+    return result
+
+
+_OVERVIEW_PREDICATES: dict[str, Callable[[str, _SwarmOverviewObservation], bool]] = {
+    MixedOverviewQueryKeyEnum.RUN_STATE.value: _matches_run_state,
+    MixedOverviewQueryKeyEnum.SETTLED_ONLY.value: _matches_settled_only,
 }
 
 
-class MixedModuleFilter(BaseDateFilter):
-    """Represent optional criteria for the combined forge-task resource."""
+class MixedSwarmOverviewFilter(BaseFilter):
+    """Bind caller-supplied Forge scope and optional Swarm observations."""
 
-    forge_name: Annotated[
-        str | None,
-        Field(description="Optional forge name to match.", max_length=100),
+    forge_request_id: Annotated[
+        WireUUID,
+        Field(
+            description="Caller-supplied Forge settlement lookup request identity.",
+            alias=MixedOverviewQueryKeyEnum.FORGE_REQUEST_ID.value,
+        ),
+    ]
+    workspace_revision: Annotated[
+        int,
+        Field(
+            description="Caller-observed Forge Workspace revision.",
+            ge=_I64_MIN,
+            le=_I64_MAX,
+            alias=MixedOverviewQueryKeyEnum.WORKSPACE_REVISION.value,
+        ),
+    ]
+    location_id: Annotated[
+        WireUUID,
+        Field(
+            description="Caller-supplied Forge Location identity.",
+            alias=MixedOverviewQueryKeyEnum.LOCATION_ID.value,
+        ),
+    ]
+    expected_revision: Annotated[
+        int,
+        Field(
+            description="Caller-observed Forge Location revision.",
+            ge=_I64_MIN,
+            le=_I64_MAX,
+            alias=MixedOverviewQueryKeyEnum.EXPECTED_REVISION.value,
+        ),
+    ]
+    relative_root: Annotated[
+        str,
+        Field(description="Caller-supplied relative Forge Workspace root."),
+    ]
+    run_state: Annotated[
+        SwarmRunStateEnum | None,
+        Field(
+            description="Optional canonical Orchestration run-state observation.",
+            alias=MixedOverviewQueryKeyEnum.RUN_STATE.value,
+        ),
     ] = None
-    task_status: Annotated[
-        OrchestrationStatus | None,
-        Field(description="Optional orchestration status to match."),
+    settled_only: Annotated[
+        bool | None,
+        Field(
+            description="When true, require an applied Forge settlement receipt.",
+            alias=MixedOverviewQueryKeyEnum.SETTLED_ONLY.value,
+        ),
     ] = None
 
-    def matches(self, forge_name: str, task_status: OrchestrationStatus, created_at: date) -> bool:
-        """Return whether a combined resource matches all configured criteria.
+    def matches_observation(
+        self,
+        run_state: SwarmRunStateEnum,
+        settlement_state: SettlementJournalStateEnum | None,
+    ) -> bool:
+        """Match only explicitly requested state observations.
 
         Args:
-            forge_name: Name on the combined forge resource.
-            task_status: Status on the combined orchestration resource.
-            created_at: Forge creation date on the combined resource.
+            run_state: Canonical state returned by Orchestration.
+            settlement_state: Forge receipt state, when a receipt exists.
         Return:
-            Whether the combined resource matches every configured criterion.
+            Whether all configured observation filters match.
         """
-        target = _MixedFilterTarget(forge_name=forge_name, task_status=task_status)
-        active_criteria: dict[str, str] = {
-            key: str(value)
-            for key, value in self.model_dump(exclude_none=True).items()
-            if key in _STRING_PREDICATES
-        }
-        fields_match = all(
-            _STRING_PREDICATES[key](value, target) for key, value in active_criteria.items()
+        observation = _SwarmOverviewObservation(
+            run_state=run_state,
+            has_applied_settlement=settlement_state == SettlementJournalStateEnum.APPLIED,
         )
-        date_match = self.matches_created_date(created_at)
-        result = fields_match and date_match
+        active_criteria = {
+            key: value
+            for key, value in self.to_query_params().items()
+            if key in _OVERVIEW_PREDICATES
+        }
+        result = all(
+            _OVERVIEW_PREDICATES[key](value, observation) for key, value in active_criteria.items()
+        )
         return result

@@ -1,0 +1,24 @@
+[package]
+name = "gateway-live-three-daemon-host"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+forge-control = { path = "../../../../../heterarchy-forge/crates/forge-control" }
+forge-domain = { path = "../../../../../heterarchy-forge/crates/forge-domain" }
+forge-persistence = { path = "../../../../../heterarchy-forge/crates/forge-persistence" }
+forge-workspace = { path = "../../../../../heterarchy-forge/crates/forge-workspace" }
+heterarchy-orchestration-auth = { path = "../../../../../heterarchy-orchestration/crates/heterarchy-orchestration-auth" }
+heterarchy-orchestration-backend = { path = "../../../../../heterarchy-orchestration/crates/heterarchy-orchestration-backend" }
+heterarchy-orchestration-operations = { path = "../../../../../heterarchy-orchestration/crates/heterarchy-orchestration-operations" }
+heterarchy-orchestration-runtime = { path = "../../../../../heterarchy-orchestration/crates/heterarchy-orchestration-runtime" }
+heterarchy-orchestration-sessions = { path = "../../../../../heterarchy-orchestration/crates/heterarchy-orchestration-sessions" }
+serde_json = "=1.0.151"
+serde = { version = "=1.0.229", features = ["derive"] }
+tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-util = "=0.7.19"
+uuid = { version = "=1.25.0", features = ["serde", "v7"] }
+
+[patch.crates-io]
+heterarchy-orchestration-policy = { path = "../../../../../heterarchy-orchestration/crates/heterarchy-orchestration-policy" }

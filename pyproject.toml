@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "Typed MCP and HTTP BFF for Heterarchy domain backends"
 requires-python = "==3.14.7"
 dependencies = [
-    "blake3==1.0.10",
+    "blake3==1.0.11",
     "dishka==1.10.1",
-    "fastapi>=0.142.2",
+    "fastapi>=0.163.1",
     "httpx>=0.28.1",
     "mcp>=2.3.0",
-    "pydantic>=2.13.5",
-    "pydantic-settings>=2.15.0",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.3",
     "uvicorn>=0.54.0",
 ]
 

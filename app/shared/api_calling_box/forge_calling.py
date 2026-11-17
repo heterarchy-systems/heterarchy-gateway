@@ -3,13 +3,17 @@
 from collections.abc import Mapping
 from typing import override
 from urllib.parse import quote
+from uuid import UUID
 
 import httpx
 
 from app.shared.api_calling_box.base_calling import BaseCalling
 from app.shared.diagnostics.request_trace import FailureScenario, RequestTrace
 from app.shared.exception import ForgeExcept
-from app.shared.types.base_types import JsonObject
+from app.shared.ingredient_element.forge.forge_enums import ForgeCommandOpEnum
+from app.shared.ingredient_element.gateway.request_trace_enums import UpstreamOutcome
+from app.shared.types.base_types import JsonValue
+from app.shared.types.upstream_exchange import UpstreamJsonExchange
 
 
 class ForgeCalling(BaseCalling):
@@ -21,6 +25,8 @@ class ForgeCalling(BaseCalling):
         base_url: str,
         trace: RequestTrace | None = None,
         failure_scenario: FailureScenario | None = None,
+        *,
+        authorization: str | None = None,
     ) -> None:
         """Initialize the Forge API caller.
 
@@ -29,6 +35,7 @@ class ForgeCalling(BaseCalling):
             base_url: Root URL for the upstream Forge API.
             trace: Optional request-scoped trace recorder.
             failure_scenario: Optional development failure injection.
+            authorization: Optional request-scoped bearer authorization value.
         Return:
             None.
         """
@@ -38,63 +45,54 @@ class ForgeCalling(BaseCalling):
             "forge",
             trace,
             failure_scenario,
+            authorization=authorization,
         )
 
-    async def fetch_forge(self, forge_id: str) -> JsonObject:
-        """Fetch one forge from the upstream API.
+    async def call_command(
+        self,
+        op: ForgeCommandOpEnum,
+        request_id: UUID,
+        envelope: Mapping[str, JsonValue],
+    ) -> UpstreamJsonExchange:
+        """Execute one versioned Forge command and preserve its HTTP status.
 
         Args:
-            forge_id: Identifier of the forge to fetch.
+            op: Closed Forge command operation used in the endpoint path.
+            request_id: Caller-supplied request identity to retain on transport failures.
+            envelope: Typed Forge command request envelope.
         Return:
-            Decoded forge JSON object.
+            Upstream status and decoded JSON value.
         """
-        payload = await self.fetch_json(f"/forges/{quote(forge_id, safe='')}")
-        return payload
+        try:
+            result = await self.execute_json_exchange(
+                method="POST",
+                path=f"/commands/{quote(op.value, safe='')}",
+                body=envelope,
+            )
+        except ForgeExcept as error:
+            raise ForgeExcept(
+                status_code=error.status_code,
+                code=error.code,
+                message=error.message,
+                retryable=False,
+                request_id=request_id,
+            ) from error
+        return result
 
-    async def fetch_forges(self, params: Mapping[str, str]) -> JsonObject:
-        """Fetch a filtered forge list from the upstream API.
+    def record_unknown_outcome(self) -> None:
+        """Mark the latest Forge exchange as an unresolved admitted command.
 
         Args:
-            params: Configured forge-list query parameters.
+            None.
         Return:
-            Decoded forge-list response object.
+            None.
         """
-        payload = await self.fetch_json("/forges", params=params)
-        return payload
-
-    async def create_forge(self, body: JsonObject) -> JsonObject:
-        """Create a forge resource on the upstream API.
-
-        Args:
-            body: JSON payload for creating the forge.
-        Return:
-            Decoded forge creation response object.
-        """
-        payload = await self.post_json("/forges", body)
-        return payload
-
-    async def update_forge(self, forge_id: str, body: JsonObject) -> JsonObject:
-        """Update an existing forge resource on the upstream API.
-
-        Args:
-            forge_id: Identifier of the forge to update.
-            body: JSON payload for updating the forge.
-        Return:
-            Decoded forge update response object.
-        """
-        payload = await self.put_json(f"/forges/{quote(forge_id, safe='')}", body)
-        return payload
-
-    async def delete_forge(self, forge_id: str) -> JsonObject:
-        """Delete a forge resource on the upstream API.
-
-        Args:
-            forge_id: Identifier of the forge to delete.
-        Return:
-            Decoded forge deletion response object.
-        """
-        payload = await self.delete_json(f"/forges/{quote(forge_id, safe='')}")
-        return payload
+        if self._trace is not None:
+            self._trace.record_upstream_outcome(
+                "forge",
+                UpstreamOutcome.UNKNOWN,
+                "Forge returned UNKNOWN_OUTCOME; readback is required",
+            )
 
     def with_trace(
         self,
@@ -110,10 +108,11 @@ class ForgeCalling(BaseCalling):
             Configured ForgeCalling bound to the trace.
         """
         caller = ForgeCalling(
-            self._client,
-            self._base_url,
+            client=self._client,
+            base_url=self._base_url,
             trace=trace,
             failure_scenario=failure_scenario,
+            authorization=self._authorization,
         )
         return caller
 
@@ -137,12 +136,9 @@ class ForgeCalling(BaseCalling):
             Structured ForgeExcept instance.
         """
         result = ForgeExcept(
-            status_code,
-            code,
-            message,
+            status_code=status_code,
+            code=code,
+            message=message,
             retryable=retryable,
         )
         return result
-
-
-ForgeCall = ForgeCalling

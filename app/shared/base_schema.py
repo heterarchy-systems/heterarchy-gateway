@@ -10,9 +10,17 @@ from pydantic import (
     Field,
     RootModel,
 )
-from pydantic.fields import FieldInfo
 
 RootValueT = TypeVar("RootValueT")
+_QUERY_FILTER_BASE: type[BaseModel] | None = None
+
+
+def _register_query_filter_base(model: type[BaseModel], *, allows_omission: bool) -> None:
+    """Register the concrete query-filter base authorized to omit nullable query keys."""
+    if not allows_omission:
+        raise TypeError("Query-filter base registration requires omission authorization")
+    global _QUERY_FILTER_BASE
+    _QUERY_FILTER_BASE = model
 
 
 def _reject_default_factories(model: type[BaseModel]) -> None:
@@ -25,6 +33,24 @@ def _reject_default_factories(model: type[BaseModel]) -> None:
     if factory_fields:
         fields = ", ".join(f"{model.__name__}.{field_name}" for field_name in factory_fields)
         raise TypeError(f"default_factory is prohibited for schema fields: {fields}")
+
+
+def _reject_implicit_defaults(model: type[BaseModel]) -> None:
+    """Require nullable named-schema fields to remain present in JSON input."""
+    implicit_fields: list[str] = [
+        field_name for field_name, field in model.model_fields.items() if not field.is_required()
+    ]
+    if not implicit_fields or _is_query_filter_schema(model=model):
+        return
+    fields = ", ".join(f"{model.__name__}.{field_name}" for field_name in implicit_fields)
+    raise TypeError(f"Implicit defaults are prohibited for schema fields: {fields}")
+
+
+def _is_query_filter_schema(model: type[BaseModel]) -> bool:
+    """Allow omission only for classes in the actual BaseFilter inheritance tree."""
+    registered_base = _QUERY_FILTER_BASE
+    result = registered_base is not None and registered_base in model.__mro__
+    return result
 
 
 class StrictSchemaModel(BaseModel):
@@ -49,7 +75,8 @@ class StrictSchemaModel(BaseModel):
             None.
         """
         super().__pydantic_on_complete__()
-        _reject_default_factories(cls)
+        _reject_default_factories(model=cls)
+        _reject_implicit_defaults(model=cls)
 
 
 class StrictRootSchemaModel(RootModel[RootValueT]):
@@ -73,28 +100,8 @@ class StrictRootSchemaModel(RootModel[RootValueT]):
             None.
         """
         super().__pydantic_on_complete__()
-        _reject_default_factories(cls)
-
-
-def exclude_none_field() -> FieldInfo:
-    """Exclude a field from serialization only when its value is None.
-
-    Returns:
-        Pydantic field metadata with a None-only exclusion predicate.
-    """
-
-    def is_none[FieldValue](value: FieldValue) -> bool:
-        """Return whether none.
-
-        Args:
-            value: Value being processed.
-
-        Returns:
-            Whether none.
-        """
-        return value is None
-
-    return Field(exclude_if=is_none)
+        _reject_default_factories(model=cls)
+        _reject_implicit_defaults(model=cls)
 
 
 class BackendReadError(StrictSchemaModel):

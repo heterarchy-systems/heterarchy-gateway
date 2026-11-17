@@ -28,5 +28,5 @@ USER 10001:10001
 RUN uv run --locked --no-sync --python 3.14.7t python -c "import sys; assert sys.version_info[:3] == (3, 14, 7) and not sys._is_gil_enabled()"
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
-    CMD uv run --locked --no-sync --python 3.14.7t python -c "import httpx; httpx.get('http://127.0.0.1:8799/healthz', timeout=2, trust_env=False).raise_for_status()"
-CMD ["sh", "-c", "uv run --locked --no-sync --python 3.14.7t python -c 'import sys; assert sys.version_info[:3] == (3, 14, 7) and not sys._is_gil_enabled()' && exec uv run --locked --no-sync --python 3.14.7t uvicorn app.bootstrap:create_app --factory --host 127.0.0.1 --port 8799 --loop asyncio --http h11 --workers 1 --limit-concurrency 100 --timeout-graceful-shutdown 10"]
+    CMD uv run --locked --no-sync --python 3.14.7t python -c "import httpx; httpx.get('http://127.0.0.1:7979/healthz', timeout=2, trust_env=False).raise_for_status()"
+CMD ["sh", "-c", "uv run --locked --no-sync --python 3.14.7t python -c 'import sys; assert sys.version_info[:3] == (3, 14, 7) and not sys._is_gil_enabled()' && exec uv run --locked --no-sync --python 3.14.7t uvicorn app.bootstrap:create_app --factory --host 127.0.0.1 --port 7979 --loop asyncio --http h11 --workers 1 --limit-concurrency 100 --timeout-graceful-shutdown 10"]

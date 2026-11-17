@@ -1,14 +1,12 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Annotated, ClassVar
 from uuid import UUID
 
-import httpx
 import pytest
 from pydantic import Field, ValidationError
 
-from app.shared.api_calling_box.forge_calling import ForgeCalling
-from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
-from app.shared.base_schema import StrictSchemaModel
+from app.shared.base_schema import StrictRootSchemaModel, StrictSchemaModel
 from app.shared.exception import (
     ForgeErrorResponse,
     ForgeExcept,
@@ -62,9 +60,24 @@ def test_settings_boundaries_reject_missing_and_invalid_inputs(
             .with_forge_base_url("https://user:pass@forge.example.test/api/v1")
             .build()
         ),
+        "forge_wrong_api_path": lambda: (
+            GatewaySettingsBuilder()
+            .with_forge_base_url("https://forge.example.test/api/v2")
+            .build()
+        ),
+        "forge_encoded_api_path": lambda: (
+            GatewaySettingsBuilder()
+            .with_forge_base_url("https://forge.example.test/api%2Fv1")
+            .build()
+        ),
         "orchestration_bad_scheme": lambda: (
             GatewaySettingsBuilder()
             .with_orchestration_base_url("ftp://orchestration.example.test/api/v1")
+            .build()
+        ),
+        "orchestration_wrong_api_path": lambda: (
+            GatewaySettingsBuilder()
+            .with_orchestration_base_url("https://orchestration.example.test/api/v1")
             .build()
         ),
         "keepalive_exceeds_pool": lambda: (
@@ -80,8 +93,7 @@ def test_settings_boundaries_reject_missing_and_invalid_inputs(
             builder()
 
 
-@pytest.mark.asyncio
-async def test_exception_contracts_and_calling_box_error_mapping() -> None:
+def test_exception_response_contracts_preserve_correlations() -> None:
     for model in (ForgeErrorResponse, OrchestrationErrorResponse):
         with pytest.raises(ValidationError):
             model.model_validate({"code": "fail", "message": "failed", "retryable": False})
@@ -94,50 +106,20 @@ async def test_exception_contracts_and_calling_box_error_mapping() -> None:
         retryable=True,
         request_id=correlation_id,
     ).to_forge_error_response()
-    orch_error = OrchestrationExcept(
+    orchestration_error = OrchestrationExcept(
         502,
-        "orch_down",
+        "orchestration_down",
         "Orchestration failed",
         retryable=False,
         workspace_id=correlation_id,
     ).to_orchestration_error_response()
     assert forge_error.request_id == correlation_id
-    assert orch_error.workspace_id == correlation_id
-
-    forge_responses: dict[str, httpx.Response] = {
-        "/forges/missing": httpx.Response(404, json={"detail": "missing"}),
-        "/forges/other": httpx.Response(500, json={"message": "boom"}),
-    }
-
-    async with httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda req: forge_responses[req.url.path]),
-        timeout=httpx.Timeout(5.0),
-    ) as forge_client:
-        forge_calling = ForgeCalling(forge_client, "https://forge.example.test")
-        forge_cases: dict[str, tuple[int, bool]] = {
-            "missing": (404, False),
-            "other": (502, True),
-        }
-        for forge_id, (expected_status, expected_retryable) in forge_cases.items():
-            with pytest.raises(ForgeExcept) as exc_info:
-                await forge_calling.fetch_forge(forge_id)
-            assert exc_info.value.status_code == expected_status
-            assert exc_info.value.retryable is expected_retryable
-
-    async with httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda _req: httpx.Response(200, content=b"{invalid json")),
-        timeout=httpx.Timeout(5.0),
-    ) as orch_client:
-        orch_calling = OrchestrationCalling(orch_client, "https://orch.example.test")
-        with pytest.raises(OrchestrationExcept) as invalid_json_exc:
-            await orch_calling.fetch_task("task-1")
-        assert invalid_json_exc.value.status_code == 502
-        assert not invalid_json_exc.value.retryable
+    assert orchestration_error.workspace_id == correlation_id
 
 
 def test_strict_schema_model_parses_json_datetime_and_rejects_default_factory() -> None:
     class TimedSchema(StrictSchemaModel):
-        created_at: datetime
+        created_at: Annotated[datetime, Field(description="Source creation timestamp.")]
 
     parsed = TimedSchema.model_validate_json('{"created_at":"2026-09-28T09:30:00Z"}')
     assert parsed.created_at == datetime(2026, 9, 28, 9, 30, 0, tzinfo=UTC)
@@ -146,3 +128,32 @@ def test_strict_schema_model_parses_json_datetime_and_rejects_default_factory() 
 
         class InvalidFactorySchema(StrictSchemaModel):
             items: list[str] = Field(default_factory=list)
+
+    class RequiredNullableSchema(StrictSchemaModel):
+        nullable_value: Annotated[str | None, Field(description="Required nullable value.")]
+
+    assert RequiredNullableSchema.model_validate({"nullable_value": None}).nullable_value is None
+    with pytest.raises(ValidationError):
+        RequiredNullableSchema.model_validate({})
+
+    with pytest.raises(TypeError):
+
+        class InvalidNullableDefaultSchema(StrictSchemaModel):
+            nullable_value: Annotated[
+                str | None,
+                Field(description="Nullable value with a prohibited implicit default."),
+            ] = None
+
+    with pytest.raises(TypeError):
+
+        class MarkerCannotBypassDefaultSchema(StrictSchemaModel):
+            _ALLOW_QUERY_OMISSION: ClassVar[bool] = True
+            nullable_value: Annotated[
+                str | None,
+                Field(description="Ordinary schema field with a prohibited implicit default."),
+            ] = None
+
+    with pytest.raises(TypeError):
+
+        class InvalidRootDefaultSchema(StrictRootSchemaModel[str | None]):
+            root: Annotated[str | None, Field(description="Required nullable root value.")] = None

@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from typing import Annotated
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException
-from pydantic import Field, TypeAdapter, ValidationError
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from app.shared.base_schema import StrictSchemaModel
 from app.shared.diagnostics.request_trace import (
@@ -36,7 +36,7 @@ class ValidationPayload(StrictSchemaModel):
 
 
 def create_diagnostics_router(
-    contracts: Mapping[ContractName, type[StrictSchemaModel]],
+    contracts: Mapping[ContractName, type[BaseModel]],
 ) -> APIRouter:
     """Create diagnostics from explicit contracts without importing private feature DTOs.
 
@@ -62,9 +62,11 @@ def create_diagnostics_router(
     ) -> ContractValidationResponse:
         model = registry.get(contract)
         if model is None:
-            raise HTTPException(status_code=404, detail="Contract is not bound")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Contract is not bound"
+            )
         try:
-            model.model_validate_json(encode_json(payload.value))
+            model.model_validate_json(encode_json(value=payload.value))
             result = ContractValidationResponse(contract=contract, valid=True, errors=[])
         except ValidationError as error:
             issues = [
@@ -83,9 +85,11 @@ def create_diagnostics_router(
         trace_id: str,
         store: FromDishka[TraceStore],
     ) -> TraceSnapshot:
-        snapshot = store.find(trace_id)
+        snapshot = store.find(trace_id=trace_id)
         if snapshot is None:
-            raise HTTPException(status_code=404, detail="Trace not found or expired")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Trace not found or expired"
+            )
         return snapshot
 
     return router

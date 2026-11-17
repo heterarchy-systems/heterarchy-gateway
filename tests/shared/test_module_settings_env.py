@@ -70,12 +70,10 @@ def test_module_settings_isolation_and_process_env_precedence(
     server = GatewayServerSettings()
 
     assert composed.forge.forge_base_url == "https://forge.example.test/api/v1"
-    assert (
-        composed.orchestration.orchestration_base_url == "https://orchestration.example.test/api/v1"
-    )
+    assert composed.orchestration.orchestration_base_url == "https://orchestration.example.test"
     assert composed.runtime.trace_capacity == 900
     assert server.host == "127.0.0.1"
-    assert server.port == 8799
+    assert server.port == 7979
 
 
 def test_legacy_dotenv_and_sibling_files_do_not_satisfy_missing_module_settings(
@@ -117,6 +115,8 @@ def test_module_env_examples_cover_exact_schema_fields_and_load(
 ) -> None:
     """Committed *_settings.env.example templates match their settings schemas exactly."""
     monkeypatch.setattr(os, "environ", {})
+    root_env_example = _ENV_DIR.parent / ".env.example"
+    assert "GATEWAY_PORT=7979" in root_env_example.read_text(encoding="utf-8")
 
     module_models: dict[SettingsModule, tuple[SettingsModelClass, ...]] = {
         SettingsModule.FORGE: (ForgeSettings,),

@@ -15,11 +15,11 @@ bff-rules:
 	$(BFF_RULES_COMMAND)
 
 format:
-	$(RUN) ruff format app
+	$(RUN) ruff format app tests
 
 lint:
-	$(RUN) ruff format --check app
-	$(RUN) ruff check app
+	$(RUN) ruff format --check app tests
+	$(RUN) ruff check app tests
 
 typecheck:
 	$(RUN) pyrefly check
@@ -30,7 +30,7 @@ test:
 	$(RUN) python -m pytest tests -q
 
 run: runtime
-	$(RUN) uvicorn app.bootstrap:create_app --factory --host 127.0.0.1 --port 8799 --loop asyncio --http h11 --workers 1 --limit-concurrency 100
+	$(RUN) uvicorn app.bootstrap:create_app --factory --host 127.0.0.1 --port 7979 --loop asyncio --http h11 --workers 1 --limit-concurrency 100
 
 check:
 	$(MAKE) runtime

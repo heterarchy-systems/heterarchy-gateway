@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+import httpx
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -22,7 +23,7 @@ class ForgeSettings(BaseSettings):
 
     forge_base_url: Annotated[
         str,
-        Field(description="Base URL for the upstream Forge backend."),
+        Field(description="Forge backend base URL including the /api/v1 prefix."),
     ]
 
     @field_validator("forge_base_url")
@@ -35,5 +36,7 @@ class ForgeSettings(BaseSettings):
         Return:
             Validated normalized URL string.
         """
-        result = validate_backend_origin(value)
+        result = validate_backend_origin(value=value)
+        if httpx.URL(result).raw_path != b"/api/v1":
+            raise ValueError("Forge base URL must end with the source API prefix /api/v1")
         return result

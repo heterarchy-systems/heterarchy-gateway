@@ -3,12 +3,14 @@ from threading import Lock
 from time import perf_counter
 from typing import Annotated
 
+from fastapi import status as http_status_codes
 from pydantic import Field
 
 from app.shared.base_schema import StrictSchemaModel
 from app.shared.ingredient_element.gateway.request_trace_enums import (
     ContractName,
     FailureScenario,
+    UpstreamOutcome,
 )
 from app.shared.types.base_types import JsonValue
 
@@ -145,21 +147,35 @@ class RequestTrace:
             )
         )
 
-    def fail_upstream(self, service_name: str, error: str) -> None:
-        """Mark the latest upstream event failed after response decoding.
+    def record_upstream_outcome(
+        self,
+        service_name: str,
+        outcome: UpstreamOutcome,
+        error: str | None,
+    ) -> None:
+        """Record the semantic outcome of the latest matching upstream exchange.
 
         Args:
-            service_name: Upstream service whose response could not be decoded.
-            error: Decoder failure description.
+            service_name: Upstream service associated with the exchange.
+            outcome: Observed result, including an unresolved command outcome.
+            error: Sanitized explanation when the outcome needs attention.
         Return:
             None.
         """
         event_name = f"BFF -> {service_name}"
-        for index, event in enumerate(self._events):
+        for index in range(len(self._events) - 1, -1, -1):
+            event = self._events[index]
             if event.name == event_name:
-                self._events[index] = TraceEvent.model_validate(
-                    {**event.model_dump(), "status": "failed", "error": error}
+                self._events[index] = TraceEvent(
+                    name=event.name,
+                    start_ms=event.start_ms,
+                    duration_ms=event.duration_ms,
+                    status=outcome.value,
+                    http_status=event.http_status,
+                    raw=event.raw,
+                    error=error,
                 )
+                break
 
     def finish(
         self,
@@ -180,7 +196,11 @@ class RequestTrace:
         self._inner_dto = inner_dto
         self._public_response = public_response
         elapsed_ms = (perf_counter() - self._started) * 1000
-        result_status = "success" if status < 400 else "failed"
+        result_status = (
+            UpstreamOutcome.SUCCESS.value if status < 400 else UpstreamOutcome.FAILED.value
+        )
+        if status == http_status_codes.HTTP_202_ACCEPTED:
+            result_status = UpstreamOutcome.UNKNOWN.value
         self._events.extend(
             [
                 TraceEvent(

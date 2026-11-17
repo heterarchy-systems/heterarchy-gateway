@@ -1,66 +1,38 @@
-"""FastAPI endpoints for Orchestration resources."""
+"""Compose the Orchestration schema-factory HTTP surface."""
 
-from typing import Annotated
+from fastapi import APIRouter, Security
+from fastapi.security import HTTPBearer
 
-from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Query, status
-
-from app.orchestration.application.cancel_orchestration import CancelOrchestrationApplication
-from app.orchestration.application.get_orchestration import GetOrchestrationApplication
-from app.orchestration.application.list_orchestrations import ListOrchestrationsApplication
-from app.orchestration.application.start_orchestration import StartOrchestrationApplication
-from app.orchestration.schema.cancel_orchestration import CancelOrchestrationResponse
-from app.orchestration.schema.get_orchestration import GetOrchestrationResponse
-from app.orchestration.schema.start_orchestration import (
-    StartOrchestrationRequest,
-    StartOrchestrationResponse,
+from app.orchestration.routers.autonomy.orchestration_autonomy_routers import (
+    router as autonomy_router,
 )
-from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
-from app.shared.filter_module.orchestration_filter import OrchestrationFilter
+from app.orchestration.routers.forge_bridge.orchestration_forge_bridge_routers import (
+    router as forge_bridge_router,
+)
+from app.orchestration.routers.profile.orchestration_profile_routers import router as profile_router
+from app.orchestration.routers.realtime.orchestration_realtime_routers import (
+    router as realtime_router,
+)
+from app.orchestration.routers.swarm.orchestration_swarm_board_routers import (
+    router as swarm_board_router,
+)
+from app.orchestration.routers.swarm.orchestration_swarm_run_routers import (
+    router as swarm_run_router,
+)
+from app.orchestration.routers.swarm.orchestration_swarm_turn_routers import (
+    router as swarm_turn_router,
+)
 
-router = APIRouter(prefix="/orchestrations", tags=["orchestration"], route_class=DishkaRoute)
+router = APIRouter(
+    prefix="/orchestrations",
+    tags=["orchestration"],
+    dependencies=[Security(HTTPBearer(auto_error=False, scheme_name="OrchestrationBearer"))],
+)
+router.include_router(profile_router)
+router.include_router(autonomy_router)
+router.include_router(swarm_run_router)
+router.include_router(swarm_turn_router)
+router.include_router(swarm_board_router)
 
-
-@router.get("", response_model=list[GetOrchestrationResponse])
-async def list_orchestrations_route(
-    filters: Annotated[OrchestrationFilter, Query()],
-    orchestration_calling: FromDishka[OrchestrationCalling],
-) -> list[GetOrchestrationResponse]:
-    items = await ListOrchestrationsApplication(orchestration_calling).execute(filters)
-    response_models = [
-        GetOrchestrationResponse.model_validate(item, from_attributes=True) for item in items
-    ]
-    return response_models
-
-
-@router.post("", response_model=StartOrchestrationResponse, status_code=status.HTTP_202_ACCEPTED)
-async def start_orchestration_route(
-    request: StartOrchestrationRequest,
-    orchestration_calling: FromDishka[OrchestrationCalling],
-) -> StartOrchestrationResponse:
-    inner_dto = await StartOrchestrationApplication(orchestration_calling).execute(
-        request.workflow_name,
-        request.inputs,
-    )
-    response_model = StartOrchestrationResponse.model_validate(inner_dto, from_attributes=True)
-    return response_model
-
-
-@router.get("/{task_id}", response_model=GetOrchestrationResponse)
-async def fetch_orchestration_route(
-    task_id: str,
-    orchestration_calling: FromDishka[OrchestrationCalling],
-) -> GetOrchestrationResponse:
-    inner_dto = await GetOrchestrationApplication(orchestration_calling).execute(task_id)
-    response_model = GetOrchestrationResponse.model_validate(inner_dto, from_attributes=True)
-    return response_model
-
-
-@router.delete("/{task_id}", response_model=CancelOrchestrationResponse)
-async def cancel_orchestration_route(
-    task_id: str,
-    orchestration_calling: FromDishka[OrchestrationCalling],
-) -> CancelOrchestrationResponse:
-    inner_dto = await CancelOrchestrationApplication(orchestration_calling).execute(task_id)
-    response_model = CancelOrchestrationResponse.model_validate(inner_dto, from_attributes=True)
-    return response_model
+router.include_router(forge_bridge_router)
+router.include_router(realtime_router)

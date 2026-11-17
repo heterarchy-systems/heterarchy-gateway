@@ -11,17 +11,19 @@ from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.contract_catalog import create_contract_catalog
 from app.forge.routers.forge_router import router as forge_router
-from app.forge.schema.get_forge import GetForgeResponse
 from app.mixed_module.routers.mixed_module_router import router as mixed_module_router
+from app.orchestration.exceptions.orchestration_exceptions import OrchestrationBackendErrorResponse
+from app.orchestration.exceptions.realtime_exceptions import OrchestrationRealtimeAdmissionError
 from app.orchestration.routers.orchestration_router import router as orchestration_router
-from app.orchestration.schema.get_orchestration import GetOrchestrationResponse
 from app.shared.api_calling_box.base_calling import provide_http_client
 from app.shared.api_calling_box.forge_calling import ForgeCalling
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
+from app.shared.api_calling_box.orchestration_event_calling import OrchestrationEventCalling
 from app.shared.base_schema import LivenessResponse
 from app.shared.diagnostics.diagnostics_router import create_diagnostics_router
-from app.shared.diagnostics.request_trace import ContractName, TraceStore
+from app.shared.diagnostics.request_trace import TraceStore
 from app.shared.exception import BaseExcept, ForgeExcept, OrchestrationExcept
 from app.shared.settings_modules.forge_settings import ForgeSettings
 from app.shared.settings_modules.gateway_settings import (
@@ -106,9 +108,9 @@ class SharedProvider(Provider):
             Async iterator yielding and closing the shared httpx.AsyncClient.
         """
         async for client in provide_http_client(
-            runtime_settings.http_timeout_seconds,
-            runtime_settings.max_connections,
-            runtime_settings.max_keepalive_connections,
+            timeout_seconds=runtime_settings.http_timeout_seconds,
+            max_connections=runtime_settings.max_connections,
+            max_keepalive_connections=runtime_settings.max_keepalive_connections,
         ):
             yield client
 
@@ -129,16 +131,25 @@ class SharedProvider(Provider):
         self,
         client: httpx.AsyncClient,
         forge_settings: ForgeSettings,
+        request: Request,
     ) -> ForgeCalling:
         """Provide a request-scoped Forge upstream caller.
 
         Args:
             client: Shared bounded asynchronous HTTP client.
             forge_settings: Bound ForgeSettings supplying the Forge base URL.
+            request: Current HTTP request carrying caller-scoped authorization.
         Return:
             Configured ForgeCalling instance.
         """
-        caller = ForgeCalling(client, forge_settings.forge_base_url)
+        authorization = _forwarded_authorization(
+            request=request, mixed_header_name="x-forge-authorization"
+        )
+        caller = ForgeCalling(
+            client=client,
+            base_url=forge_settings.forge_base_url,
+            authorization=authorization,
+        )
         return caller
 
     @provide(scope=Scope.REQUEST)
@@ -146,17 +157,71 @@ class SharedProvider(Provider):
         self,
         client: httpx.AsyncClient,
         orchestration_settings: OrchestrationSettings,
+        request: Request,
     ) -> OrchestrationCalling:
         """Provide a request-scoped Orchestration upstream caller.
 
         Args:
             client: Shared bounded asynchronous HTTP client.
             orchestration_settings: Bound OrchestrationSettings supplying the base URL.
+            request: Current HTTP request carrying caller-scoped authorization.
         Return:
             Configured OrchestrationCalling instance.
         """
-        caller = OrchestrationCalling(client, orchestration_settings.orchestration_base_url)
+        authorization = _forwarded_authorization(
+            request=request, mixed_header_name="x-orchestration-authorization"
+        )
+        caller = OrchestrationCalling(
+            client=client,
+            base_url=orchestration_settings.orchestration_base_url,
+            authorization=authorization,
+        )
         return caller
+
+    @provide(scope=Scope.REQUEST)
+    async def provide_orchestration_event_calling(
+        self,
+        orchestration_settings: OrchestrationSettings,
+        runtime_settings: GatewayRuntimeSettings,
+        request: Request,
+    ) -> AsyncIterator[OrchestrationEventCalling]:
+        """Own the isolated HTTP client for one request's event subscription.
+
+        Args:
+            orchestration_settings: Source Orchestration origin.
+            runtime_settings: Bounded connection and request-phase timeout policy.
+            request: Current request carrying its backend credential.
+        Return:
+            Event caller closed when the request finishes or disconnects.
+        """
+        caller = OrchestrationEventCalling(
+            base_url=orchestration_settings.orchestration_base_url,
+            authorization=_forwarded_authorization(
+                request=request, mixed_header_name="x-orchestration-authorization"
+            ),
+            timeout_seconds=runtime_settings.http_timeout_seconds,
+            transport=None,
+        )
+        try:
+            yield caller
+        finally:
+            await caller.aclose()
+
+
+def _forwarded_authorization(request: Request, mixed_header_name: str) -> str | None:
+    """Select one request-scoped bearer credential for a backend owner.
+
+    Args:
+        request: Current Gateway request.
+        mixed_header_name: Backend-specific header used by mixed composition routes.
+    Return:
+        The selected authorization value, if the caller supplied one.
+    """
+    if request.url.path.startswith("/mixed/"):
+        authorization = request.headers.get(mixed_header_name)
+    else:
+        authorization = request.headers.get("authorization")
+    return authorization
 
 
 def _assert_no_gil() -> None:
@@ -180,6 +245,27 @@ async def _handle_orchestration_exception(_request: Request, exc: Exception) -> 
         status_code=exc.status_code,
         content=exc.to_orchestration_error_response().model_dump(mode="json"),
     )
+
+
+async def _handle_realtime_admission_exception(_request: Request, exc: Exception) -> JSONResponse:
+    """Preserve the source JSON rejection and its reconnect advice before streaming.
+
+    Args:
+        _request: Current event subscription request.
+        exc: Typed realtime admission error raised before response headers.
+    Return:
+        Validated source error response retaining its HTTP status and Retry-After.
+    """
+    if not isinstance(exc, OrchestrationRealtimeAdmissionError):
+        raise exc
+    payload = OrchestrationBackendErrorResponse.model_validate(exc.error.to_dict())
+    headers = {"Retry-After": exc.retry_after} if exc.retry_after is not None else None
+    result = JSONResponse(
+        status_code=exc.status_code,
+        content=payload.model_dump(mode="json"),
+        headers=headers,
+    )
+    return result
 
 
 async def _handle_base_exception(_request: Request, exc: Exception) -> JSONResponse:
@@ -208,7 +294,7 @@ def create_app(
     app_container = (
         container
         if container is not None
-        else make_async_container(SharedProvider(resolved_settings), FastapiProvider())
+        else make_async_container(SharedProvider(settings=resolved_settings), FastapiProvider())
     )
 
     @asynccontextmanager
@@ -223,6 +309,9 @@ def create_app(
     fastapi_app.add_exception_handler(ForgeExcept, _handle_forge_exception)
     fastapi_app.add_exception_handler(OrchestrationExcept, _handle_orchestration_exception)
     fastapi_app.add_exception_handler(BaseExcept, _handle_base_exception)
+    fastapi_app.add_exception_handler(
+        OrchestrationRealtimeAdmissionError, _handle_realtime_admission_exception
+    )
 
     @fastapi_app.get("/healthz", response_model=LivenessResponse)
     async def healthz_route() -> LivenessResponse:
@@ -231,13 +320,6 @@ def create_app(
     fastapi_app.include_router(forge_router)
     fastapi_app.include_router(orchestration_router)
     fastapi_app.include_router(mixed_module_router)
-    fastapi_app.include_router(
-        create_diagnostics_router(
-            {
-                ContractName.FORGE: GetForgeResponse,
-                ContractName.ORCHESTRATION: GetOrchestrationResponse,
-            },
-        ),
-    )
+    fastapi_app.include_router(create_diagnostics_router(contracts=create_contract_catalog()))
     setup_dishka(app_container, fastapi_app)
     return fastapi_app

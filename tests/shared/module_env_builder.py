@@ -13,7 +13,7 @@ MODULE_ENV_PAYLOADS: dict[SettingsModule, dict[str, str]] = {
         "GATEWAY_FORGE_BASE_URL": "https://forge.example.test/api/v1",
     },
     SettingsModule.ORCHESTRATION: {
-        "GATEWAY_ORCHESTRATION_BASE_URL": "https://orchestration.example.test/api/v1",
+        "GATEWAY_ORCHESTRATION_BASE_URL": "https://orchestration.example.test",
     },
     SettingsModule.GATEWAY: {
         "GATEWAY_FAILURE_SIMULATION_ENABLED": "false",
@@ -22,7 +22,7 @@ MODULE_ENV_PAYLOADS: dict[SettingsModule, dict[str, str]] = {
         "GATEWAY_MAX_KEEPALIVE_CONNECTIONS": "20",
         "GATEWAY_TRACE_CAPACITY": "500",
         "GATEWAY_HOST": "127.0.0.1",
-        "GATEWAY_PORT": "8799",
+        "GATEWAY_PORT": "7979",
     },
 }
 

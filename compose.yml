@@ -8,6 +8,8 @@ services:
     image: heterarchy-gateway:local
     network_mode: host
     user: "10001:10001"
+    environment:
+      GATEWAY_PORT: "7979"
     init: true
     read_only: true
     volumes:

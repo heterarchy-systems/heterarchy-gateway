@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+printf '%s\n' 'east-west worker output' > e2e7_settled.txt

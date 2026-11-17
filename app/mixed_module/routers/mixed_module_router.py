@@ -1,38 +1,214 @@
-"""FastAPI endpoints composing Forge and Orchestration views with diagnostics tracing."""
+"""Typed HTTP entry points for the Mixed observation routes."""
 
-from time import perf_counter
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Header, HTTPException, Query, Response, status
-from pydantic import TypeAdapter
+from fastapi import APIRouter, Header, Query, Request, Response, status
 
-from app.forge.application.get_forge import GetForgeApplication
-from app.mixed_module.application.get_mixed_module import GetMixedModuleApplication
-from app.mixed_module.application.inner_dto.get_mixed_module_inner_dto import (
-    GetMixedModuleInnerDto,
+from app.mixed_module.exceptions.mixed_exceptions import (
+    MixedDependencyFailureResponse,
+    MixedHttpDetailResponse,
 )
-from app.mixed_module.schema.get_mixed_module import GetMixedModuleResponse
-from app.orchestration.application.get_orchestration import GetOrchestrationApplication
+from app.mixed_module.schema.mixed_dag_governance_schema import (
+    MixedDagGovernanceRequest,
+    MixedDagGovernanceResponse,
+)
+from app.mixed_module.schema.mixed_swarm_overview_schema import (
+    MixedSwarmOverviewResponse,
+)
+from app.mixed_module.utils.mixed_route_utils import MixedRouteExecutor
 from app.shared.api_calling_box.forge_calling import ForgeCalling
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
-from app.shared.diagnostics.request_trace import FailureScenario, RequestTrace, TraceStore
-from app.shared.filter_module.mixed_module_filter import MixedModuleFilter
+from app.shared.diagnostics.request_trace import FailureScenario, TraceStore
+from app.shared.filter_module.mixed_module_filter import MixedSwarmOverviewFilter
 from app.shared.settings_modules.gateway_settings import GatewayRuntimeSettings
-from app.shared.types.json_contract import decode_json
-from app.shared.types.upstream_payload import model_to_json_value
+from app.shared.types.base_types import JsonObject
+from app.shared.types.http_types import (
+    ContentResponseDefinition,
+    ResponseModelDefinition,
+    ResponseModels,
+    build_response_models,
+)
+
+_FASTAPI_VALIDATION_SCHEMA: JsonObject = {
+    "title": "HTTPValidationError",
+    "type": "object",
+    "properties": {
+        "detail": {
+            "title": "Detail",
+            "type": "array",
+            "items": {
+                "title": "ValidationError",
+                "type": "object",
+                "properties": {
+                    "loc": {
+                        "title": "Location",
+                        "type": "array",
+                        "items": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+                    },
+                    "msg": {"title": "Message", "type": "string"},
+                    "type": {"title": "Error Type", "type": "string"},
+                    "input": {},
+                    "ctx": {"title": "Context", "type": "object"},
+                },
+                "required": ["loc", "msg", "type"],
+            },
+        }
+    },
+}
+_VALIDATION_ERROR_CONTENT: JsonObject = {
+    "application/json": {
+        "schema": {
+            "anyOf": [
+                {"$ref": "#/components/schemas/MixedDependencyFailureResponse"},
+                _FASTAPI_VALIDATION_SCHEMA,
+            ]
+        }
+    }
+}
+
+MIXED_SWARM_OVERVIEW_RESPONSES: ResponseModels = build_response_models(
+    definitions=(
+        ResponseModelDefinition(
+            status_code=status.HTTP_202_ACCEPTED,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_403_FORBIDDEN,
+            model=MixedDependencyFailureResponse | MixedHttpDetailResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_404_NOT_FOUND,
+            model=MixedDependencyFailureResponse | MixedHttpDetailResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_409_CONFLICT,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            model=MixedDependencyFailureResponse,
+        ),
+        ContentResponseDefinition(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            description="Mixed source rejection or FastAPI request validation error.",
+            content=_VALIDATION_ERROR_CONTENT,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(status_code="default", model=MixedDependencyFailureResponse),
+    )
+)
+
+MIXED_DAG_GOVERNANCE_RESPONSES: ResponseModels = build_response_models(
+    definitions=(
+        ResponseModelDefinition(
+            status_code=status.HTTP_202_ACCEPTED,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_403_FORBIDDEN,
+            model=MixedDependencyFailureResponse | MixedHttpDetailResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_404_NOT_FOUND,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_409_CONFLICT,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            model=MixedDependencyFailureResponse,
+        ),
+        ContentResponseDefinition(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            description="Mixed source rejection or FastAPI request validation error.",
+            content=_VALIDATION_ERROR_CONTENT,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            model=MixedDependencyFailureResponse,
+        ),
+        ResponseModelDefinition(status_code="default", model=MixedDependencyFailureResponse),
+    )
+)
 
 router = APIRouter(prefix="/mixed", tags=["mixed-module"], route_class=DishkaRoute)
-_INNER_DTO_ADAPTER: TypeAdapter[GetMixedModuleInnerDto] = TypeAdapter(GetMixedModuleInnerDto)
 
 
-@router.get("/{forge_id}/tasks/{task_id}", response_model=GetMixedModuleResponse)
-async def fetch_mixed_module_route(
-    forge_id: str,
-    task_id: str,
-    filters: Annotated[MixedModuleFilter, Query()],
+@router.get(
+    "/workspaces/{workspace_id}/swarms/{swarm_run_id}/overview",
+    response_model=MixedSwarmOverviewResponse | MixedDependencyFailureResponse,
+    status_code=status.HTTP_200_OK,
+    responses=MIXED_SWARM_OVERVIEW_RESPONSES,
+)
+async def mixed_swarm_overview_route(
+    workspace_id: UUID,
+    swarm_run_id: UUID,
+    request: Request,
+    filters: Annotated[MixedSwarmOverviewFilter, Query()],
     response: Response,
+    forge_authorization: Annotated[
+        str,
+        Header(alias="X-Forge-Authorization", min_length=1),
+    ],
+    orchestration_authorization: Annotated[
+        str,
+        Header(alias="X-Orchestration-Authorization", min_length=1),
+    ],
     forge_calling: FromDishka[ForgeCalling],
     orchestration_calling: FromDishka[OrchestrationCalling],
     runtime_settings: FromDishka[GatewayRuntimeSettings],
@@ -41,47 +217,61 @@ async def fetch_mixed_module_route(
         FailureScenario | None,
         Header(alias="X-BFF-Failure"),
     ] = None,
-) -> GetMixedModuleResponse:
-    trace_id = str(uuid4())
-    trace = RequestTrace(trace_id)
-    response.headers["X-Trace-ID"] = trace_id
-    if failure_scenario is not None and not runtime_settings.failure_simulation_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Failure simulation is disabled",
-        )
-    application = GetMixedModuleApplication(
-        GetForgeApplication(forge_calling.with_trace(trace, failure_scenario)),
-        GetOrchestrationApplication(orchestration_calling.with_trace(trace, failure_scenario)),
+) -> MixedSwarmOverviewResponse | MixedDependencyFailureResponse:
+    """Return the exact Forge and Orchestration observations for one Swarm."""
+    result = await MixedRouteExecutor(
+        forge_calling=forge_calling,
+        orchestration_calling=orchestration_calling,
+        runtime_settings=runtime_settings,
+        trace_store=trace_store,
+    ).execute_swarm_overview(
+        request=request,
+        response=response,
+        workspace_id=workspace_id,
+        swarm_run_id=swarm_run_id,
+        filters=filters,
+        failure_scenario=failure_scenario,
     )
-    normalize_started = perf_counter()
-    try:
-        inner_dto = await application.execute(forge_id, task_id)
-    except Exception as error:
-        trace.record_stage("BFF compose", normalize_started, "failed", str(error))
-        trace.finish(status.HTTP_502_BAD_GATEWAY, None, None)
-        trace_store.record(trace.snapshot())
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="An upstream dependency failed",
-            headers={"X-Trace-ID": trace_id},
-        ) from error
-    trace.record_stage("BFF compose", normalize_started, "success")
-    inner_json = decode_json(_INNER_DTO_ADAPTER.dump_json(inner_dto))
-    if not filters.matches(
-        inner_dto.forge.name,
-        inner_dto.orchestration.status,
-        inner_dto.forge.created_at.date(),
-    ):
-        trace.finish(status.HTTP_404_NOT_FOUND, inner_json, None)
-        trace_store.record(trace.snapshot())
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No mixed resource matches the filters",
-            headers={"X-Trace-ID": trace_id},
-        )
-    response_model = GetMixedModuleResponse.model_validate(inner_dto, from_attributes=True)
-    public_json = model_to_json_value(response_model)
-    trace.finish(status.HTTP_200_OK, inner_json, public_json)
-    trace_store.record(trace.snapshot())
-    return response_model
+    return result
+
+
+@router.post(
+    "/workspaces/{workspace_id}/dags/governance-overview",
+    response_model=MixedDagGovernanceResponse | MixedDependencyFailureResponse,
+    status_code=status.HTTP_200_OK,
+    responses=MIXED_DAG_GOVERNANCE_RESPONSES,
+)
+async def mixed_dag_governance_route(
+    workspace_id: UUID,
+    request: MixedDagGovernanceRequest,
+    response: Response,
+    forge_authorization: Annotated[
+        str,
+        Header(alias="X-Forge-Authorization", min_length=1),
+    ],
+    orchestration_authorization: Annotated[
+        str,
+        Header(alias="X-Orchestration-Authorization", min_length=1),
+    ],
+    forge_calling: FromDishka[ForgeCalling],
+    orchestration_calling: FromDishka[OrchestrationCalling],
+    runtime_settings: FromDishka[GatewayRuntimeSettings],
+    trace_store: FromDishka[TraceStore],
+    failure_scenario: Annotated[
+        FailureScenario | None,
+        Header(alias="X-BFF-Failure"),
+    ] = None,
+) -> MixedDagGovernanceResponse | MixedDependencyFailureResponse:
+    """Return current Forge DAG and selected Orchestration governance reads."""
+    result = await MixedRouteExecutor(
+        forge_calling=forge_calling,
+        orchestration_calling=orchestration_calling,
+        runtime_settings=runtime_settings,
+        trace_store=trace_store,
+    ).execute_dag_governance(
+        response=response,
+        workspace_id=workspace_id,
+        request=request,
+        failure_scenario=failure_scenario,
+    )
+    return result

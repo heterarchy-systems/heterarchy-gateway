@@ -1,112 +1,171 @@
 # Heterarchy Gateway
 
-Forge와 Orchestration의 공개 backend 계약을 HTTP/MCP 경계에서 전달하는 BFF입니다. 도메인 상태·권한·영속성은 backend에 남습니다. 현재 전체 제품 이관을 완료하지 않았으며 [준비 상태 감사](docs/backend-readiness-2026-10-04.md)에 실제 source 계약과 blocker를 기록했습니다.
+포트 **7979**에서 Forge와 Orchestration의 실제 HTTP 계약을 검증하고 조합하는 Schema Contract Factory입니다. 도메인 상태 전이, 권한 판정, Git 작업과 영속성은 각 backend가 담당합니다.
 
-Python은 **CPython 3.14.7 free-threaded**, DI는 **Dishka 1.10.1**입니다. 최신 사용자 요청에 따라 일반 Python 정책을 갱신했고, 잠긴 의존성 import 및 실제 앱 startup/shutdown 뒤 GIL disabled를 확인합니다. dependency-injector와 orjson은 제거했고 JSON은 검증된 typed codec을 사용합니다.
+## 실행
 
-Python 환경·설치·실행은 **uv만** 사용합니다. pip, python -m pip, uv pip는 사용하지 않습니다. 정확한 interpreter는 .python-version, 재현 가능한 Python dependency graph는 uv.lock이 소유합니다.
+CPython **3.14.7t free-threaded**와 **Dishka 1.10.1**을 사용합니다. Python 실행과 잠긴 의존성 해석은 uv를 사용합니다.
 
-설정은 [shared/settings_modules](app/shared/settings_modules)에 나눕니다. `base_settings.py`는 공통 pydantic-settings 정책, `orchestration_settings.py`와 `forge_settings.py`는 각 backend origin·고정 API 경로, `gateway_settings.py`는 모듈 조합과 worker 자원 정책을 관리합니다. 서버 origin은 `GATEWAY_ORCHESTRATION_BASE_URL`, `GATEWAY_FORGE_BASE_URL`로 지정합니다. root가 설정을 호출기에 전달하며 source와 다른 경로는 거부합니다.
+처음 설정할 때 `module_setting_envs/`의 세 `*_settings.env.example`을 대응하는 `*_settings.env`로 복사하고 실제 실행 환경의 값을 입력합니다. 기존 설정 파일은 유지합니다. 각 모델은 자기 모듈의 env 파일과 process 환경변수를 읽으며 process 값이 우선합니다. root `.env`는 Docker Compose 보간용입니다.
+
+| 설정 | 로컬 backend 예시 |
+| --- | --- |
+| `GATEWAY_FORGE_BASE_URL` | `http://127.0.0.1:8797/api/v1` |
+| `GATEWAY_ORCHESTRATION_BASE_URL` | `http://127.0.0.1:8798` |
+| Gateway bind | `127.0.0.1:7979` |
+
+Forge base URL은 `/api/v1`을 포함하고 Orchestration base URL은 origin만 받습니다. 설정은 URL 자격증명, query, fragment와 다른 API prefix를 거부합니다.
 
 ```sh
-uv python install 3.14.7t
-make sync
 make ci
 make run
 ```
 
-CI의 공통 진입점은 `make ci`입니다. [.github/workflows/ci.yml](.github/workflows/ci.yml)은 trusted main push와 main 수동 실행에서 같은 실제 검사들을 실행합니다. 공개 저장소에 비공개 하네스를 넣지 않으므로 별도의 CI 하네스 공급이 필요합니다. 현재 원격 workflow·secrets·실행 상태와 설정 전제는 [CI 안내](docs/ci.md)에 구분했습니다. 로컬 검사 통과를 원격 CI 성공으로 보고하지 않습니다.
+`make run`은 `uv run --locked --python 3.14.7t uvicorn app.bootstrap:create_app --factory`를 asyncio/h11, 한 worker, concurrency 100으로 실행합니다. HTTP client와 Dishka container는 worker의 같은 event loop에서 사용하고 lifespan 종료 시 닫습니다.
 
-`make ci`는 Python runtime·typing·회귀 검사를 실행합니다. 로컬 검증을 실제 backend 인증 연동으로 확대하지 않습니다.
+## 공개 계약
 
-기존 React/Vite/Tauri control panel, Chrome browser companion, SwiftUI 데스크톱 GUI는 모두 제거했습니다.
+| 표면 | 작업 수 | Gateway prefix |
+| --- | --- | --- |
+| Forge Workspace·Activity·DAG·Swarm commands | 13 | `/forges` |
+| Orchestration Profile | 6 | `/orchestrations/profiles` |
+| Orchestration Autonomy | 10 | `/orchestrations/workspaces` |
+| Orchestration Native Swarm | 20 | `/orchestrations/workspaces/{workspace_id}/swarms` |
+| East-West 브리지 | 3 | `/orchestrations/workspaces/{workspace_id}` |
+| Workspace SSE stream | 1 | `/orchestrations/workspaces/{workspace_id}/events` |
+| 두 backend 합성 조회 | 2 | `/mixed/workspaces/{workspace_id}` |
 
-GUI의 새 Workspace 등록은 폴더 이름을 사용한 ChatGPT Project 자동 생성·연결로 이어집니다. 기존 Workspace는 중복 생성하지 않습니다. [설정 및 복구 절차](docs/workspace-chatgpt-project.md)에 준비 조건을 정리했으며, Source 권한 설정, 실제 브라우저 접근, Project 안의 에이전트 실행은 각각 별도 증거로 확인합니다.
+실제 method, path와 JSON Schema는 실행 중인 앱의 `/docs`와 `/openapi.json`에서 확인합니다. `/healthz`는 Gateway liveness를 반환합니다.
 
-Swift 앱은 기본적으로 `~/.config/heterarchy-gateway/desktop.json`을 사용합니다. 별도 로컬 검증 환경은 앱 실행 시 `GATEWAY_DESKTOP_CONFIG`에 절대 경로를 지정합니다. 빈 값·상대 경로는 거부하며 기존 설정으로 돌아가 다른 runtime을 제어하지 않습니다. 설정의 소유권과 credential/catalog 검사는 Gateway owner가 동일하게 적용합니다.
+Forge는 `forge_api`, `request_id`, `op`, `payload`를 가진 versioned command envelope를 받습니다. 현재 DAG 조회 operation은 `dag.read_current`입니다. 다음은 Location 목록 요청입니다.
 
-make run은 loopback 127.0.0.1:8799, asyncio/h11, 한 worker, concurrency 100으로 실행합니다. /healthz는 이 gateway의 liveness만 표시합니다. /readyz나 전체 backend 준비를 성공으로 표시하는 가짜 endpoint는 없습니다. 기본 설정에서는 backend domain route를 노출하지 않습니다.
-
-[로컬 Container 실행 안내](docs/local-container.md)에 Dockerfile·Compose와 실제 Linux arm64 검증 결과를 기록했습니다. 비root·읽기전용 이미지에서 GUI와 no-GIL 기동은 확인했으며 현재 Docker Desktop의 Mac host 접근 및 실제 backend 인증 통합은 미완료입니다. CI workflow는 `make container-config`도 호출합니다.
-
-확인한 Orchestration Session 읽기 경로를 연결하려면 operator가 실제 loopback backend origin을 지정합니다.
-
-```sh
-GATEWAY_ORCHESTRATION_BASE_URL=http://127.0.0.1:8798 make run
+```json
+{
+  "forge_api": 1,
+  "request_id": "11111111-1111-1111-1111-111111111111",
+  "op": "location.list",
+  "payload": {}
+}
 ```
 
-GET /api/v1/orchestration/sessions/{session_id}는 요청에서 전달받은 인증을 backend에 넘기며, 최종 principal/Session 소유권 검증은 Orchestration이 수행합니다. 설정된 origin은 literal loopback만 허용하고 URL credential/path/query/fragment를 금지합니다. shared client 기본 credential/cookie를 요청의 authority로 사용하지 않습니다. 알려진 request identity와 source-shaped response를 검사하고 자동 재시도하지 않습니다.
+이 body를 `POST /forges/locations/list`에 전달합니다. `request_id`는 caller가 선택한 논리 요청 identity로 유지합니다. Forge 응답의 `202 UNKNOWN_OUTCOME`은 오류 envelope와 readback 정보를 보존합니다. Gateway는 요청을 자동 재제출하지 않습니다.
 
-같은 Orchestration origin에서 [Workspace Team 목록·단건 조회](docs/team-read.md)도 연결합니다. 목록 limit과 truncated, 선택 Session header, backend-owned Workspace 읽기 권한을 보존하고 단건 absence는 source 그대로 `200 null`을 반환합니다. Gateway가 operator나 Session membership을 생성하지 않습니다.
+Profile과 Swarm 생성은 원천의 신규 `201`과 replay `200`을 보존합니다. Profile 목록은 root array입니다. 구조화된 `409` 결과와 일반 backend 오류는 각각 해당 계약으로 검증합니다. 손상된 성공 응답은 sanitized `502`, timeout은 `504`로 반환합니다.
 
-[Leadership·Team 구성원 읽기](docs/governance-read.md)는 같은 backend 권한과 optional Session selector를 사용합니다. Leadership의 nullable view·cursor history, backend deadline 판단과 Team 참여 목록의 원본 revision·시간·정렬을 유지합니다. 투표·리뷰·진행·확정·복구의 mutation/read 계약은 아래 거버넌스 MCP 검증에 추가됐으며, 실제 참여자 준비·선거·handoff E2E는 별도로 확인합니다.
+## 인증과 입력
 
-[Agent Profile 목록·단건 조회](docs/profile-read.md)는 전역 bearer catalog 계약을 유지합니다. 목록은 기본64 및 최대64의 배열이고, 단건 부재는 `404 NOT_FOUND`입니다. Team의 Workspace·Session 권한을 이 전역 조회에 추가하지 않습니다.
+전용 Forge·Orchestration route에는 해당 backend의 `Authorization`을 전달합니다. Mixed에는 `X-Forge-Authorization`과 `X-Orchestration-Authorization`을 각각 필수로 전달합니다. 요청 자격증명은 request-scoped caller에 보관합니다.
 
-Forge Location 목록은 실제 Forge origin을 `GATEWAY_FORGE_BASE_URL`에 설정한 경우에만 `GET /api/v1/forge/locations?request_id=<UUID>`로 노출합니다. incoming bearer는 Forge API credential이며 Orchestration 토큰과 동일시하지 않습니다. 공개 읽기 요청을 source의 `POST /api/v1/commands/location.list`와 빈 payload로 전달하고, 최대 100개의 Location ID·이름·revision·state만 반환합니다. 비공개 root와 timestamp 또는 임의 pagination은 추가하지 않습니다. source가 허용하는 nil UUID도 보존합니다.
+JSON body와 응답의 모든 필드는 required입니다. nullable 필드도 키와 명시적 `null`을 입력합니다. Source가 합법적으로 생략하는 응답 필드는 DTO parser에서 명시적 null로 정규화합니다. GET query의 `BaseFilter`만 선택 키 생략을 지원합니다. 필수 query 누락, 중복 키와 알 수 없는 query 키는 `422`를 반환합니다.
 
-Forge 응답의 request ID·API version·성공 flag·오류 code/status를 검증합니다. parse 전 인증 실패의 nil correlation을 구분하고, 인증 실패는 공개 401로 전달합니다. `UNKNOWN_OUTCOME`은 공개 202와 retryable=false로 반환하며 자동 재제출하지 않습니다. 오류 응답은 caller의 request ID를 유지하고 backend 내부 message·recovery hint를 노출하지 않습니다. 현재 검증은 실제 앱·Dishka와 mock backend 계약이며 Forge 실서비스 연결을 의미하지 않습니다.
+FastAPI 경계는 strict/frozen Pydantic, 내부 command/result는 기본값 없는 frozen/slotted/keyword-only dataclass와 closed total TypedDict를 사용합니다. 큰 순수 목록 변환에는 순서가 보존되는 bounded `threaded_map`을 사용합니다.
 
-[Forge Workspace inventory](docs/workspace-inventory.md)는 Location ID와 revision fence를 요구하는 보호된 읽기로 연결합니다. 원본 registered/unavailable 행과 Workspace 등록 필드를 유지하며 등록·활성화는 수행하지 않습니다.
+## Mixed 조회
 
-[Forge Activity 목록·단건 읽기](docs/activity-read.md)도 보호된 Workspace scope에서 제공합니다. 원본 locator 형식, revision, lease 상태와 단건 부재의 `200/activity:null`을 보존하고 lifecycle 재시도 권한을 추가하지 않습니다.
+### Swarm overview
 
-[Forge Queue 관찰](docs/queue-observations.md)은 전역 상태, Workspace runtime과 저장 설정을 전달합니다. 저장값과 실제 적용값을 분리하고 원본의 비원자 관찰 의미를 유지합니다. 상태 관찰이 설정 저장·즉시 적용·재시도 허가를 뜻하지 않습니다.
+`GET /mixed/workspaces/{workspace_id}/swarms/{swarm_run_id}/overview`는 Orchestration inspection과 Forge settlement 조회를 병렬로 수행합니다. 다음 query는 필수입니다.
 
-[Forge Goal·DAG·assignment 읽기](docs/forge-plan-reads.md)는 네 source command를 HTTP/MCP로 연결합니다. 부재의 found=false, 저장된 DAG 출력 순서와 서로 다른 revision fence를 보존합니다. 실제 Forge 인증 통합은 아직 미검증입니다.
+| Query | Caller가 제공하는 값 |
+| --- | --- |
+| `forge_request_id` | Forge command 요청 UUID |
+| `workspace_revision` | 관측한 Forge Workspace revision |
+| `location_id` | Forge Location UUID |
+| `expected_revision` | 관측한 Location revision |
+| `relative_root` | 해당 Location 아래 Workspace 상대 경로 |
 
-[Forge 검증 상태 조회](docs/verification-projection.md)는 명령별 최신 running·passed·failed와 원본 disposition을 전달합니다. 검증을 실행하거나 실행 권한을 부여하지 않습니다.
+Workspace와 Swarm identity는 path에서 가져옵니다. Locator와 revision은 caller가 관측한 값을 그대로 사용합니다.
 
-[Forge Diff 목록·inventory](docs/diff-read.md)는 전체 evidence metadata와 요약 metadata를 분리해 제공합니다. 두 API의 nil 허용 차이, 원본의 100개 한도와 nullable payload를 유지하며 artifact content·health를 추가하지 않습니다.
+선택 query `run_state`는 Orchestration의 canonical run state와 일치하는 결과를 선택합니다. `settled_only=true`는 Forge receipt가 있고 journal state가 `applied`인 결과를 선택합니다. `false`와 생략은 정산 상태를 제한하지 않습니다. 필터 불일치는 trace와 함께 `404`를 반환합니다.
 
-[Diff 본문·artifact health](docs/diff-artifact-read.md)는 verified content와 현재 health를 분리해 전달합니다. 두 operation은 최대 256-entry full evidence 때문에 고정 4 MiB consumer cap을 사용합니다. Read의 빈 본문·128 KiB UTF-8 byte 한도와 doctor에 source scope echo·content·has-content가 없다는 차이를 유지합니다.
+### DAG governance overview
 
-[Writer Lease 단건·목록 관찰](docs/writer-lease-read.md)은 만료됐지만 해제되지 않은 lease, source 관찰 시각, nullable Session과 64/4 scope 페이지를 유지합니다. 조회를 갱신·복구 권한으로 바꾸지 않습니다.
+`POST /mixed/workspaces/{workspace_id}/dags/governance-overview`는 완전한 Forge `dag.read_current` command와 governance 조회 키 `goalId`·`dagRevision`을 받습니다. body의 `forge_request`에는 완전한 Forge command를, `governance_query`에는 `goalId`와 `dagRevision`을 전달합니다. 두 키는 모두 필수입니다. Forge scope의 Workspace와 path, 두 Goal identity를 호출 전에 대조합니다.
 
-[실행 evidence 관찰](docs/execution-observation.md)은 issuer inventory와 bounded output ledger를 제공합니다. 현재 Goal selection과 historical provenance를 구분하고 실행·재시도·grant를 만들지 않습니다. Inventory는 source limit256에 맞춘 고정4MiB, observe는1MiB 한도를 사용합니다.
+응답은 Forge current DAG와 요청 revision의 Orchestration governance를 함께 담습니다. 두 read는 독립 시점 관측이며 각각의 revision을 응답에 유지합니다.
 
-Session, Forge Location·Workspace inventory·Activity·Queue·Goal·DAG·assignment·검증 상태·Diff, Team·구성원·Leadership 및 Profile 조회를 [MCP 어댑터](docs/mcp-read.md)에서도 사용합니다. MCP는 기본 비활성이며 실제 issuer/resource와 검증기가 필요합니다. 명시적 local OAuth 설정과 private credential profile을 사용하면 root가 실제 발급·검증 경로를 구성합니다. 설정된 backend와 승인된 scope의 도구만 노출합니다. Team 생성과 정확한 조회는 아래 협업 명령 검증에 추가됐으며 실제 참여자 협업 성공은 별도 증거가 필요합니다.
+두 Mixed route는 요청 의존성을 해결한 후 `TaskGroup`에서 두 read를 실행합니다. 한 의존성의 실패는 sibling 취소와 join 후 원천 HTTP 상태·오류·readback을 포함하는 typed failure로 반환합니다. 두 backend가 함께 실패하면 Forge 상태를 외부 HTTP 상태로 선택하고, 수집된 모든 원천 상태와 오류를 failures 배열에 보존합니다. 전체 요청 deadline은 Gateway runtime timeout을 사용하며 Gateway-owned 504로 반환합니다.
 
-[MCP 데스크톱 검증](docs/mcp-desktop-verification-2026-10-07.md)에서 트레이·독립 설정 창·MCP 시작/중지/재시작, 실제 OAuth와 native backend 읽기 결과를 확인할 수 있습니다. 전체 ChatGPT 협업 E2E와 public HTTPS 연결은 아직 완료되지 않았습니다.
+## 전송 예산과 진단
 
-[협업 명령 검증](docs/mcp-cooperation-verification-2026-10-07.md)에는 Team 생성·정확한 조회, AgentRequest admit·recover의 등록과 로컬 실행 증거를 기록했습니다. 변경 도구에는 `gateway.write`와 개별 작업 scope가 모두 필요하며, 불확정 결과는 자동 재시도 없이 정확한 readback 입력을 반환합니다. 공개 연결 설정은 `.env.example`의 opt-in 항목을 사용합니다. 공개 모드는 native owner 승인과 private OAuth client catalog가 필요하며, 실제 ChatGPT 연결 성공과 도메인 협업 성공은 별도로 확인합니다.
+일반 backend 응답 cap은 1 MiB입니다. Native Swarm은 요청 128 KiB, 응답 2 MiB를 적용합니다. 초과 요청은 업스트림 전송 전에 `413`, 초과 응답은 `502`로 반환합니다. Dispatch deadline은 `min(max(runtime timeout, startup + execution + termination + 5초), 900초)`이며 전체 exchange와 HTTPX phase timeout에 함께 적용합니다. 응답 stream은 성공·거부·취소 시 정리합니다.
 
-[공개 MCP 준비 검증](docs/public-mcp-verification-2026-10-07.md)은 HTTPS metadata, public 경로 차단, 클라이언트 등록 영속화, 실제 native 승인과 로컬 TCP 결과를 다룹니다. Cloudflare 목적지 변경은 아직 저장 전이며 외부 ChatGPT 성공으로 해석하지 않습니다.
+`GET /diagnostics/contracts`는 실제 53 backend 작업과 2개 Mixed 조합의 response schema를 operation identity로 제공합니다. `POST /diagnostics/contracts/{contract}/validate`는 해당 response contract를 검증합니다. Mixed 응답의 `X-Trace-ID`로 `GET /diagnostics/traces/{trace_id}`에서 bounded in-memory trace를 조회합니다.
 
-[거버넌스 MCP 검증](docs/governance-mcp-verification-2026-10-07.md)에는 투표·리뷰·발언·리더 진행·확정·복구의 10개 경로를 기록했습니다. 로컬 계약과 SDK 검증은 통과했으며 실제 선거와 리더 교체는 source 권한·참여자·시간 조건을 갖춘 별도 E2E로 확인해야 합니다.
+개발용 `X-BFF-Failure`는 `GATEWAY_FAILURE_SIMULATION_ENABLED=true`일 때 사용합니다. 비활성 상태의 주입 요청은 `403`입니다. 진단 trace에는 backend payload가 포함됩니다.
 
-[Provider-worker 검증](docs/provider-worker-verification-2026-10-07.md)은 Orchestration의 15개 operator API 호출기와 기존 OAuth 등록을 보존하는 읽기 범위 갱신을 다룹니다. 공용 HTTP pool은 환경 프록시를 사용하지 않아 loopback용 source credential이 프록시로 전달되지 않습니다.
+## East-West 브리지와 실시간 이벤트
 
-기본 upstream 전체 deadline은 10초(설정 최대 60초), 기본 응답 cap은 1 MiB입니다. Source-valid bounded response가 더 큰 일부 operation에는 [응답 예산 호환성](docs/response-budget-compatibility.md)에 기록한 exact fixed cap을 적용합니다. 이것은 per-response/worker 정책이며 여러 backend의 전체 처리량·성능이나 global distributed admission 보장이 아닙니다. backend가 실제로 실행 중이지 않으면 조회는 unavailable로 실패합니다. 인증정보 생성·운영 restart·DB 변경을 자동 수행하지 않습니다.
+Orchestration이 Forge 호출과 정산 projection을 소유하는 세 경로를 제공합니다.
 
-Dishka async container/client는 한 worker의 한 event loop에서만 사용합니다. OS-thread/loop 사이 공유와 get_sync를 금지합니다. request 의존성을 병렬 fanout 전에 해석하고 typed instance를 전달합니다. APP client는 lifespan의 finally에서 닫히고 request child는 ASGI 요청 종료/취소 시 정리됩니다. mutable request/auth/scope를 APP state나 공용 header에 저장하지 않습니다. 이 검증은 Dishka의 모든 사용법에 대한 일반적인 free-threading 인증이 아닙니다.
+- `POST /orchestrations/workspaces/{workspace_id}/swarms/{swarm_run_id}/forge-converge`
+- `POST /orchestrations/workspaces/{workspace_id}/swarms/{swarm_run_id}/forge-settle`
+- `POST /orchestrations/workspaces/{workspace_id}/autonomy-outbox/sync`
 
-Ruff는 py314, correctness/import/async/FastAPI/security/typing을 검사하고 unsafe fix는 사용하지 않습니다. Pyrefly는 strict이며 missing import를 Any로 치환하지 않습니다. 소유한 app과 tests에서 Any·object·Protocol 타입을 예외 없이 금지합니다. 검사 적용 코드는 app/shared/guardrails/에서 .agents/의 하네스 설정·출처·guard 정의를 읽습니다. Pydantic은 kwargs 없는 completion hook을 사용하고, deferred model도 factory 금지를 우회할 수 없도록 검증합니다.
+브리지 body의 Source 기본값 필드도 required이며 nullable 키는 명시적 null을 입력합니다. 응답은 원천 HTTP 상태와 run·settlement·outbox identity를 검증합니다. Outbox sync의 선택 limit은 null 또는 1부터 64까지이며 mutation으로 등록합니다.
+
+Dispatch body에서 `forgeSessionId`에 유효한 Orchestration session UUID를 주고 `defaultWorktreePath`에 빈 문자열을 전달하면 Source가 해당 Forge session으로 격리 worktree를 준비하고 clean exit 결과를 자동 캡처합니다. 전체 필수 body는 `/docs`의 `DispatchSwarmTurnRequest`에서 확인합니다.
+
+`GET /orchestrations/workspaces/{workspace_id}/events`는 요청 Authorization과 선택 `Last-Event-ID`, `X-Orchestration-Session-Id`를 Source에 전달합니다. 일반 프레임은 `event: state_changed`, `id: epoch:sequence`와 7개 필드의 camelCase JSON data를 사용합니다. cursor는 SSE id로 관리합니다. 재동기화 프레임은 `event: resync_required`, `retry: 2000`, `{reason,currentEpoch,lastDeliveredSequence}` data 뒤 종료됩니다. 이벤트 종류 23개와 실제 Source resync reason을 strict schema로 검증합니다.
+
+SSE는 별도 request-owned HTTP client를 사용합니다. queue는 64개, frame은 16 KiB, queued wire bytes는 1 MiB로 제한하며 downstream send deadline은 30초입니다. Source의 15초 keepalive에 맞춰 read phase timeout은 45초를 사용합니다. 연결·write·pool timeout은 Gateway runtime 설정을 적용합니다. Source admission 실패는 SSE 헤더를 시작하기 전에 원래 JSON 상태와 `Retry-After`를 반환합니다.
+
+## 실제 3-데몬 테스트
 
 ```sh
-make runtime    # direct/native imports + actual startup/shutdown no-GIL
-make lint       # formatting and lint
-make typecheck  # strict types
-make guards     # canonical harness guards with Gateway policy
-make test       # focused contract/lifecycle regression tests
+uv run --locked --python 3.14.7t python -m pytest tests/integration/test_live_three_daemon_e2e.py -q
 ```
 
-기존 strict/frozen/default-factory 거부와 source guard scope/predicate는 회귀로 보존했습니다. diagnostics는 명시적 public contract/store를 받는 factory이며 default 앱에 mount하지 않습니다. 실제 계약이나 참조가 없던 example.com 기반 Forge/workflow/task 호출기 3개는 제거했습니다. 등록된 실제 읽기 계약만 source와 설정에서 관리합니다.
+테스트는 격리된 Forge 실행 파일 프로세스, Orchestration Source fixture-host 프로세스, Gateway uvicorn 프로세스를 사용합니다. Gateway 포트는 7979이며 Profile·Scope·Swarm·Worker/Verifier·Dispatch·브리지·정산·Mixed·SSE의 HTTP 흐름을 Gateway로 호출합니다. 초기 registry·session·coordinator는 테스트 소유 Rust 도구가 canonical Source API로 준비합니다.
 
-개발 전 [기능별 실행 계획](docs/plans/00-readiness-and-execution-2026-10-04.md)과 [Forge Location 읽기 계획](docs/plans/04-forge-location-read-2026-10-05.md)을 Alexandria에 저장·read-back했습니다. [계약 ledger](docs/backend-contract-ledger.md)에서 source·mock·실서비스 증거를 구분합니다. Forge 전체 read/mutation, MCP parity, Workspace/SSE recovery와 실제 backend integration은 아직 별도 gate입니다. 하네스 전체 machine-contract binding과 배포 완료를 source/style 테스트만으로 주장하지 않습니다.
+macOS의 stock Orchestration CLI 인증 경로가 사용자 HOME에 고정돼 있어 fixture-host는 Source가 제공하는 token/runtime 주입 API로 격리된 인증 저장소를 사용합니다. 실제 production serving·도메인 코드를 실행하며 테스트 전용 broker protocol fixture와 로컬 codex 실행 파일 fixture를 사용합니다. 외부 AI provider 실행과 stock CLI의 사용자 인증 저장소 발견은 검증 범위에서 별도로 구분합니다.
 
-도서관 원문과 provenance는 private .agents/에 보관합니다. [Dishka container/scopes](https://dishka.readthedocs.io/en/stable/container/), [FastAPI integration](https://dishka.readthedocs.io/en/stable/integrations/fastapi.html), [uv interpreter 선택](https://docs.astral.sh/uv/concepts/python-versions/), [Ruff 설정](https://docs.astral.sh/ruff/configuration/), [Pyrefly 설정](https://pyrefly.org/en/docs/configuration/)을 설정 근거로 참고했습니다.
+Rust fixture는 인접 Forge·Orchestration checkout과 지정 SSD를 사용합니다. build/cache/temp는 `/Users/imhaneul/Documents/herterarchy/.codex/rust-ssd` 정책으로 `/Volumes/256.SSD/RustBuild`에 배치하고 실제 Git worktree는 그 밖의 테스트 scratch에 생성합니다. 테스트는 자신이 시작한 프로세스를 소유하고 종료합니다.
 
+## 기능별 코드 구성
 
-개발 전 [.agents/DEVELOPMENT_RULES.md](.agents/DEVELOPMENT_RULES.md)를 읽습니다. 기능 모듈은 `schemas/`, `routers/`와 오류 계약을 위한 `exceptions/`로 구성합니다. Session 모델은 `schemas/session_schemas.py`, 라우트는 `routers/session_routers.py`, 기능별 타입 별칭은 `schemas/types/session_types.py`, 오류 응답은 `exceptions/session_exceptions.py`에 둡니다. API 호출·설정·자원 기반은 `app/shared/`가 소유합니다. 관련 작은 클래스는 합칠 수 있으며 모든 기능을 한 파일에 몰지 않습니다. Any/object/Protocol 타입을 금지하고, 모델 필드는 `Annotated[타입, described_field(...)]`, 라우터 상태 값은 FastAPI status 상수로 선언합니다. `make bff-rules`는 구조·타입·import·registry·조건부 route inventory를 검사하며 문서의 모든 규칙을 자동 증명하는 것은 아닙니다.
+스키마는 `{모듈}_{기능}_schema.py`, 기능 라우터는 `{모듈}_{기능}_routers.py`로 관리합니다. 작은 최상위 router는 prefix·인증 metadata와 child router 연결을 담당합니다.
 
-[응답 예산 호환성](docs/response-budget-compatibility.md)에 source 최대응답과 operation별 소비자 한도를 기록했습니다. Goal 목록8MiB·DAG12MiB·Team 목록4MiB·Diff inventory2MiB, Diff read·doctor4MiB와 execution inventory4MiB를 각각 고정 설정으로 전달합니다. Global 기본값, unresolved full Diff list, execution observe와 그 밖의 audited operation은1MiB를 유지합니다. Full Diff list는 source pagination/aggregate 계약이 없으므로 모든 유효한 응답을 지원한다는 전체 이관 증거는 아직 없습니다.
+```text
+app/orchestration/
+  schema/
+    autonomy/    orchestration_autonomy_*_schema.py
+    swarm/       orchestration_swarm_*_schema.py
+    profile/     orchestration_profile_schema.py
+    execution/   orchestration_execution_schema.py
+    forge_bridge/orchestration_forge_bridge_schema.py
+    realtime/    orchestration_realtime_event_schema.py
+    types/
+  routers/
+    autonomy/    orchestration_autonomy_routers.py
+    swarm/       orchestration_swarm_*_routers.py
+    profile/     orchestration_profile_routers.py
+    forge_bridge/orchestration_forge_bridge_routers.py
+    realtime/    orchestration_realtime_routers.py
 
-[Forge source 파일 목록](docs/forge-source-file-list.md)은 exact Workspace·Activity와 nested native directory를 source `file.list`에 전달합니다. HTTP GET과 MCP `forge_files_list`가 같은 typed caller를 사용하고, source default512 entries/64KiB native path bytes, no-follow classification·raw-name order·truncation을 보존합니다. Runtime ID·관찰 시각을 ownership/heartbeat 권한으로 해석하거나 Gateway에서 파일을 직접 읽지 않습니다. 실제 Forge 인증 연결은 별도 미검증입니다.
+app/forge/
+  schema/       envelope/, location/, workspace/, activity/, dag/, swarm/
+  routers/      workspace/, dag/, swarm/
+```
 
-[Forge source 내용·텍스트 검색](docs/forge-source-slice-search.md)은 exact Activity/Workspace에서 UTF-8 line slice와literalquery를읽습니다. Slice의모든줄hash를유지하도록고정12MiB consumer cap을사용하고, search/file.list/global1MiB는유지합니다. Whole-file EOL·final-newline과fragment를혼동하지않고, 검색native path·zero-based line-digit·preview bytebudget과source traversal/truncation을보존합니다. 같은typedcaller를HTTP/MCP에연결했고공통오류는source exceptions에모았습니다.
+`swarm/` 스키마는 실제 계약 책임에 따라 identity·workspace·capture·convergence·settlement로 묶습니다. 카탈로그와 private HARNESS의 contract 경로도 해당 기능 모듈을 직접 참조합니다.
 
+FastAPI 상태별 응답 metadata는 공통 `ResponseModelDefinition`·`ResponseContentDefinition`과 closed TypedDict를 사용해 선언합니다. Forge·Orchestration의 공통 오류 집합과 Mixed의 각 view별 집합을 라우터에서 재사용합니다. 실제 HTTP 본문은 기존 Pydantic 응답 모델로 검증합니다. 프로젝트 함수·Application 호출은 keyword 인자로 매개변수의 의미를 명시합니다.
 
-현재 일곱 화면은 지원되는 HTTP read 13종에 연결돼 있습니다. Forge/O token은 페이지 메모리에만 공급하며 disconnect/pagehide에서 비웁니다. Location을 읽고 선택하면 해당 revision의 Workspace 목록을 선택할 수 있습니다. Orchestration Workspace는 별도 입력하며 Forge Workspace와 자동 동일시하지 않습니다. [화면 연결과 실제 검증 범위](docs/handoffs/glm/main-screen-wiring-2026-10-06.md), [후속 GLM 업무](docs/handoffs/glm/next-wave-2026-10-06.md)를 참고합니다.
+실시간 wire 이름은 `StrEnum`, 바이트·개수·시간 예산은 `IntEnum`이 소유합니다. 기존 Python 타입이나 DTO 필드를 다시 문자열로 적던 중복 marker는 실제 타입·필드 참조로 정리했습니다. 원본 guard가 요구하는 Queue 생성자의 양수 literal `64`는 Enum 예산과의 일치 및 byte-budget 곱을 회귀로 검사합니다.
 
-Activity 선택 및 AgentRequest/Approval 화면 통합을 완료했습니다. [BFF 실행 검증](docs/handoffs/glm/main-g21-g22-integration-2026-10-06.md)은 실제 Gateway와 명시적 mock upstream을 TCP로 연결하고 브라우저까지 확인한 증거입니다. 실제 Rust backend 인증 연동 증거와 구분합니다.
+## 검증
+
+```sh
+uv run --locked --python 3.14.7t python -c "import sys; assert sys.version_info[:3] == (3, 14, 7) and not sys._is_gil_enabled()"
+uv run --locked --python 3.14.7t ruff format --check app tests
+uv run --locked --python 3.14.7t ruff check app tests
+uv run --locked --python 3.14.7t pyrefly check
+uv run --locked --python 3.14.7t python .agents/python_bff_harness/guardrails/guardrail_runner.py app
+uv run --locked --python 3.14.7t python -m pytest tests -q
+make ci
+```
+
+단위 계약은 ASGI·MockTransport 회귀로, 실제 루프백 업무 흐름은 위 3-데몬 테스트로 검증합니다. 외부 AI provider 실행, stock Orchestration CLI의 사용자 인증 저장소 발견, 원격 CI와 배포는 별도 검증 범위입니다. Container 구성 검사는 `make container-config`로 실행합니다.
+
+개발 규칙은 `.agents/DEVELOPMENT_RULES.md`, 단계별 구현 계획은 `docs/plans/00-master-architecture-and-rules.md`부터 `06-east-west-bridge-sse-and-live-3daemon-e2e.md`까지 적용합니다. private 하네스는 `.agents/python_bff_harness/`에서 공급합니다.
