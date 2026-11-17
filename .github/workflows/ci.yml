@@ -36,17 +36,11 @@ jobs:
 
       - name: Restore private harness
         env:
-          GATEWAY_PRIVATE_HARNESS_URL: ${{ secrets.GATEWAY_PRIVATE_HARNESS_URL }}
+          GATEWAY_PRIVATE_HARNESS_TAR_GZ_B64: ${{ secrets.GATEWAY_PRIVATE_HARNESS_TAR_GZ_B64 }}
           GATEWAY_PRIVATE_HARNESS_SHA256: ${{ secrets.GATEWAY_PRIVATE_HARNESS_SHA256 }}
         shell: bash
         run: |
-          if [ -z "$GATEWAY_PRIVATE_HARNESS_URL" ] || [ -z "$GATEWAY_PRIVATE_HARNESS_SHA256" ]; then
-            echo 'Private harness URL and SHA-256 secrets are required; refusing to skip guardrails.' >&2
-            exit 1
-          fi
-          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --silent --show-error --location --max-time 60 --max-filesize 10485760 --output "$RUNNER_TEMP/gateway-harness.tar.gz" "$GATEWAY_PRIVATE_HARNESS_URL"
-          export GATEWAY_PRIVATE_HARNESS_ARCHIVE="$RUNNER_TEMP/gateway-harness.tar.gz"
-          uv run --locked --python 3.14.7t python -m app.shared.guardrails.ci_harness
+          uv run --locked --python 3.14.7t python .github/scripts/restore_private_harness.py --destination "$GITHUB_WORKSPACE"
 
       - name: Run Python runtime, type, guardrail, and regression gates
         run: make check
@@ -58,5 +52,4 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -rf .agents
-          rm -f "$RUNNER_TEMP/gateway-harness.tar.gz"
+          rm -rf .agents/python_bff_harness
