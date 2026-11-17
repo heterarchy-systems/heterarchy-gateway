@@ -16,11 +16,17 @@ jobs:
   check:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: heterarchy-gateway
+    env:
+      GATEWAY_LIVE_RUST_LAUNCHER: ${{ github.workspace }}/heterarchy-gateway/.github/scripts/rust_ci.sh
     steps:
-      - name: Checkout
+      - name: Checkout Gateway
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: heterarchy-gateway
           persist-credentials: false
 
       - name: Install uv
@@ -38,18 +44,66 @@ jobs:
         env:
           GATEWAY_PRIVATE_HARNESS_TAR_GZ_B64: ${{ secrets.GATEWAY_PRIVATE_HARNESS_TAR_GZ_B64 }}
           GATEWAY_PRIVATE_HARNESS_SHA256: ${{ secrets.GATEWAY_PRIVATE_HARNESS_SHA256 }}
-        shell: bash
+        run: >-
+          uv run --locked --python 3.14.7t python
+          .github/scripts/restore_private_harness.py
+          --destination "$GITHUB_WORKSPACE/heterarchy-gateway"
+
+      - name: Checkout Forge source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: heterarchy-systems/heterarchy-forge
+          ref: c850f30ca3eb5ea455ddd613d0cd5456da4422c9
+          path: heterarchy-forge
+          persist-credentials: false
+
+      - name: Checkout Orchestration source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: heterarchy-systems/heterarchy-orchestration
+          ref: 56d1d8d459765399fd2640e6478d843de67663ce
+          path: heterarchy-orchestration
+          persist-credentials: false
+
+      - name: Checkout Broker source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: heterarchy-systems/heterarchy-broker
+          ref: 17eb66ad47b284384aee6a77d2945fe09825220d
+          path: heterarchy-broker
+          persist-credentials: false
+
+      - name: Install locked Rust toolchain
         run: |
-          uv run --locked --python 3.14.7t python .github/scripts/restore_private_harness.py --destination "$GITHUB_WORKSPACE"
+          printf 'GATEWAY_LIVE_RUST_BUILD_ROOT=%s/gateway-rust-build\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          rustup toolchain install 1.98.0 --profile minimal --component clippy --component rustfmt --component rust-analyzer
+
+      - name: Fetch and build Forge with locked dependencies
+        working-directory: heterarchy-forge
+        run: |
+          "$GATEWAY_LIVE_RUST_LAUNCHER" forge cargo fetch --locked --target x86_64-unknown-linux-gnu
+          "$GATEWAY_LIVE_RUST_LAUNCHER" forge cargo build --locked --offline -p forge-backend
+
+      - name: Fetch and build source-backed Orchestration fixture
+        working-directory: heterarchy-orchestration
+        run: |
+          manifest="$GITHUB_WORKSPACE/heterarchy-gateway/tests/integration/fixtures/live_three_daemon/Cargo.toml"
+          "$GATEWAY_LIVE_RUST_LAUNCHER" orchestration cargo fetch --locked --target x86_64-unknown-linux-gnu --manifest-path "$manifest"
+          "$GATEWAY_LIVE_RUST_LAUNCHER" orchestration cargo build --locked --offline --manifest-path "$manifest" --bin gateway-live-three-daemon-host
 
       - name: Run Python runtime, type, guardrail, and regression gates
-        run: make check
+        run: make ci
+
+      - name: Validate CI helper scripts
+        run: |
+          uv run --locked --python 3.14.7t ruff format --check .github/scripts
+          uv run --locked --python 3.14.7t ruff check .github/scripts
+          bash -n .github/scripts/rust_ci.sh
 
       - name: Validate local container configuration
         run: make container-config
 
       - name: Remove private CI material
         if: always()
-        shell: bash
-        run: |
-          rm -rf .agents/python_bff_harness
+        working-directory: ${{ github.workspace }}
+        run: rm -rf "$GITHUB_WORKSPACE/heterarchy-gateway/.agents/python_bff_harness"

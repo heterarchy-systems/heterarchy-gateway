@@ -12,7 +12,11 @@ from tests.shared.live_three_daemon_builder import (
     LiveThreeDaemonBuilder,
     _capture_process,
     _reserve_loopback_port,
+    _rust_launcher_command,
+    _rust_runtime_paths,
 )
+
+_RUST_CI_LAUNCHER = Path(__file__).resolve().parents[2] / ".github" / "scripts" / "rust_ci.sh"
 
 
 class _RecordingBuilder(LiveThreeDaemonBuilder):
@@ -114,3 +118,86 @@ async def test_capture_process_reaps_group_when_parent_is_cancelled(tmp_path: Pa
                 pass
         server.close()
         await server.wait_closed()
+
+
+def test_rust_runtime_paths_preserve_defaults_and_accept_ci_overrides(tmp_path: Path) -> None:
+    default_launcher, default_build_root = _rust_runtime_paths(environ={})
+    herterarchy_root = Path(__file__).resolve().parents[2].parent
+    assert default_launcher == herterarchy_root / ".codex" / "rust-ssd"
+    assert default_build_root == Path("/Volumes/256.SSD/RustBuild")
+    assert _rust_launcher_command(launcher=default_launcher) == [
+        sys.executable,
+        str(default_launcher),
+    ]
+
+    launcher = tmp_path / "rust-ci.sh"
+    build_root = tmp_path / "RustBuild"
+    configured_launcher, configured_build_root = _rust_runtime_paths(
+        environ={
+            "GATEWAY_LIVE_RUST_LAUNCHER": str(launcher),
+            "GATEWAY_LIVE_RUST_BUILD_ROOT": str(build_root),
+        }
+    )
+    assert configured_launcher == launcher
+    assert configured_build_root == build_root
+    assert _rust_launcher_command(launcher=launcher) == [str(launcher)]
+
+    with pytest.raises(RuntimeError, match="GATEWAY_LIVE_RUST_BUILD_ROOT"):
+        _rust_runtime_paths(environ={"GATEWAY_LIVE_RUST_BUILD_ROOT": "relative-build"})
+    with pytest.raises(RuntimeError, match="GATEWAY_LIVE_RUST_LAUNCHER"):
+        _rust_runtime_paths(environ={"GATEWAY_LIVE_RUST_LAUNCHER": "relative-launcher"})
+
+
+@pytest.mark.parametrize("category", ("forge", "orchestration"))
+@pytest.mark.asyncio
+async def test_rust_ci_launcher_uses_category_build_root(
+    tmp_path: Path,
+    category: str,
+) -> None:
+    build_root = tmp_path / "RustBuild"
+    environment = {
+        "GATEWAY_LIVE_RUST_BUILD_ROOT": str(build_root),
+        "PATH": os.environ.get("PATH") or "/usr/bin:/bin",
+    }
+    output = await _capture_process(
+        [str(_RUST_CI_LAUNCHER), category, "env"],
+        working_directory=tmp_path,
+        environment=environment,
+        timeout_seconds=5,
+    )
+    configured_environment = dict(
+        line.split("=", maxsplit=1) for line in output.splitlines() if "=" in line
+    )
+
+    assert configured_environment["CARGO_HOME"] == str(build_root / "cargo-home")
+    assert configured_environment["CARGO_TARGET_DIR"] == str(build_root / category)
+    assert configured_environment["TMPDIR"] == str(build_root / "tmp")
+    assert configured_environment["CARGO_INCREMENTAL"] == "0"
+    assert configured_environment["CARGO_PROFILE_DEV_DEBUG"] == "0"
+    assert configured_environment["CARGO_PROFILE_TEST_DEBUG"] == "0"
+    assert (build_root / "cargo-home").is_dir()
+    assert (build_root / category).is_dir()
+    assert (build_root / "tmp").is_dir()
+
+
+@pytest.mark.parametrize(
+    "build_root",
+    (None, "relative-build"),
+    ids=("missing", "relative"),
+)
+@pytest.mark.asyncio
+async def test_rust_ci_launcher_rejects_missing_or_relative_build_root(
+    tmp_path: Path,
+    build_root: str | None,
+) -> None:
+    environment = {"PATH": os.environ.get("PATH") or "/usr/bin:/bin"}
+    if build_root is not None:
+        environment["GATEWAY_LIVE_RUST_BUILD_ROOT"] = build_root
+
+    with pytest.raises(RuntimeError, match="GATEWAY_LIVE_RUST_BUILD_ROOT"):
+        await _capture_process(
+            [str(_RUST_CI_LAUNCHER), "forge", "env"],
+            working_directory=tmp_path,
+            environment=environment,
+            timeout_seconds=5,
+        )

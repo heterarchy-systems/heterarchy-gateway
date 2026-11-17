@@ -5,6 +5,7 @@ import os
 import signal
 import socket
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
@@ -17,17 +18,52 @@ _GATEWAY_ROOT = Path(__file__).resolve().parents[2]
 _HERTERARCHY_ROOT = _GATEWAY_ROOT.parent
 _FORGE_ROOT = _HERTERARCHY_ROOT / "heterarchy-forge"
 _ORCHESTRATION_ROOT = _HERTERARCHY_ROOT / "heterarchy-orchestration"
-_RUST_SSD = _HERTERARCHY_ROOT / ".codex" / "rust-ssd"
-_RUST_BUILD = Path("/Volumes/256.SSD/RustBuild")
-_FORGE_BINARY = _RUST_BUILD / "forge" / "debug" / "forge-backend"
 _FIXTURE_MANIFEST = (
     _GATEWAY_ROOT / "tests" / "integration" / "fixtures" / "live_three_daemon" / "Cargo.toml"
 )
-_FIXTURE_BINARY = _RUST_BUILD / "orchestration" / "debug" / "gateway-live-three-daemon-host"
 _CODEX_SHIM_DIRECTORY = _FIXTURE_MANIFEST.parent / "bin"
 _CODEX_SHIM = _CODEX_SHIM_DIRECTORY / "codex"
 _GATEWAY_PORT = 7979
 _READY_TIMEOUT_SECONDS = 45.0
+
+
+def _rust_runtime_paths(*, environ: Mapping[str, str]) -> tuple[Path, Path]:
+    """Select the local Rust launcher and shared build root.
+
+    Args:
+        environ: Environment providing optional live-test Rust path overrides.
+    Return:
+        Launcher path and category-rooted Cargo build directory.
+    """
+    launcher_default = _HERTERARCHY_ROOT / ".codex" / "rust-ssd"
+    launcher = Path(environ.get("GATEWAY_LIVE_RUST_LAUNCHER", str(launcher_default)))
+    build_root = Path(environ.get("GATEWAY_LIVE_RUST_BUILD_ROOT", "/Volumes/256.SSD/RustBuild"))
+    if not launcher.is_absolute():
+        raise RuntimeError("GATEWAY_LIVE_RUST_LAUNCHER must be an absolute path")
+    if not build_root.is_absolute():
+        raise RuntimeError("GATEWAY_LIVE_RUST_BUILD_ROOT must be an absolute path")
+    result = launcher, build_root
+    return result
+
+
+_RUST_SSD, _RUST_BUILD = _rust_runtime_paths(environ=os.environ)
+_FORGE_BINARY = _RUST_BUILD / "forge" / "debug" / "forge-backend"
+_FIXTURE_BINARY = _RUST_BUILD / "orchestration" / "debug" / "gateway-live-three-daemon-host"
+
+
+def _rust_launcher_command(*, launcher: Path) -> list[str]:
+    """Build the argv prefix for the local Python or CI shell launcher.
+
+    Args:
+        launcher: Configured Rust launcher path.
+    Return:
+        Executable and optional interpreter arguments for the launcher.
+    """
+    if launcher.suffix == ".sh":
+        result = [str(launcher)]
+    else:
+        result = [sys.executable, str(launcher)]
+    return result
 
 
 @dataclass(frozen=True, slots=True, kw_only=True, repr=False)
@@ -508,7 +544,7 @@ async def _assert_source_checkout(
 
 
 async def _build_fixture_host() -> None:
-    """Build the Source-backed fixture host under the canonical Rust SSD target.
+    """Build the Source-backed fixture host under the configured Rust target.
 
     Args:
         None.
@@ -535,7 +571,7 @@ async def _run_rust_build(
     arguments: list[str],
     category: str,
 ) -> None:
-    """Run Cargo with the Gateway uv interpreter and the approved Rust SSD target.
+    """Run Cargo with the Gateway uv interpreter and configured build launcher.
 
     Args:
         source_root: Working Source checkout whose rust-toolchain selects Cargo.
@@ -544,9 +580,9 @@ async def _run_rust_build(
     Return:
         None after a successful locked build.
     """
+    launcher_command = _rust_launcher_command(launcher=_RUST_SSD)
     command = [
-        sys.executable,
-        str(_RUST_SSD),
+        *launcher_command,
         category,
         "cargo",
         *arguments,
