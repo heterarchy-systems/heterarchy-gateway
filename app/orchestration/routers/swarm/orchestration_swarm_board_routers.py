@@ -37,13 +37,22 @@ from app.orchestration.schema.types.swarm_types import NonNilSwarmUUID
 from app.orchestration.utils.orchestration_route_utils import orchestration_http_response
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
 from app.shared.exception import OrchestrationErrorResponse
-from app.shared.types.http_types import ResponseModels
+from app.shared.types.http_types import (
+    ResponseModelDefinition,
+    ResponseModels,
+    build_response_models,
+)
 from app.shared.utils.query_validation import checked_query_filter
 
 router = APIRouter(prefix="/workspaces", route_class=DishkaRoute)
-SWARM_ERROR_RESPONSES: ResponseModels = ORCHESTRATION_ERROR_RESPONSES | {
-    status.HTTP_413_CONTENT_TOO_LARGE: {"model": OrchestrationErrorResponse},
-}
+SWARM_ERROR_RESPONSES: ResponseModels = ORCHESTRATION_ERROR_RESPONSES | build_response_models(
+    definitions=(
+        ResponseModelDefinition(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            model=OrchestrationErrorResponse,
+        ),
+    )
+)
 
 
 @router.post(
@@ -52,7 +61,15 @@ SWARM_ERROR_RESPONSES: ResponseModels = ORCHESTRATION_ERROR_RESPONSES | {
         PostSwarmMessageResponse | OrchestrationBackendErrorResponse | OrchestrationErrorResponse
     ),
     status_code=status.HTTP_201_CREATED,
-    responses=SWARM_ERROR_RESPONSES | {status.HTTP_200_OK: {"model": PostSwarmMessageResponse}},
+    responses=SWARM_ERROR_RESPONSES
+    | build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_200_OK,
+                model=PostSwarmMessageResponse,
+            ),
+        )
+    ),
 )
 async def post_swarm_message_route(
     workspace_id: NonNilSwarmUUID,
@@ -136,7 +153,15 @@ async def read_swarm_messages_route(
         | OrchestrationErrorResponse
     ),
     status_code=status.HTTP_201_CREATED,
-    responses=SWARM_ERROR_RESPONSES | {status.HTTP_200_OK: {"model": SwarmVerificationPanelSchema}},
+    responses=SWARM_ERROR_RESPONSES
+    | build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_200_OK,
+                model=SwarmVerificationPanelSchema,
+            ),
+        )
+    ),
 )
 async def create_swarm_panel_route(
     workspace_id: NonNilSwarmUUID,
@@ -176,7 +201,15 @@ async def create_swarm_panel_route(
     | OrchestrationBackendErrorResponse
     | OrchestrationErrorResponse,
     status_code=status.HTTP_201_CREATED,
-    responses=SWARM_ERROR_RESPONSES | {status.HTTP_200_OK: {"model": SwarmVerdictSchema}},
+    responses=SWARM_ERROR_RESPONSES
+    | build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_200_OK,
+                model=SwarmVerdictSchema,
+            ),
+        )
+    ),
 )
 async def record_swarm_verdict_route(
     workspace_id: NonNilSwarmUUID,

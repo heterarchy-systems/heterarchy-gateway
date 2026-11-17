@@ -23,6 +23,7 @@ from app.orchestration.schema.profile.orchestration_profile_schema import (
 )
 from app.orchestration.utils.orchestration_route_utils import orchestration_http_response
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
+from app.shared.types.http_types import ResponseModelDefinition, build_response_models
 from app.shared.utils.query_validation import checked_query_filter
 
 router = APIRouter(prefix="/profiles", route_class=DishkaRoute)
@@ -33,7 +34,14 @@ router = APIRouter(prefix="/profiles", route_class=DishkaRoute)
     response_model=ProfileCreateResponse | OrchestrationBackendErrorResponse,
     status_code=status.HTTP_201_CREATED,
     responses=ORCHESTRATION_ERROR_RESPONSES
-    | {status.HTTP_200_OK: {"model": ProfileCreateResponse}},
+    | build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_200_OK,
+                model=ProfileCreateResponse,
+            ),
+        )
+    ),
 )
 async def create_profile_route(
     payload: CreateProfileRequest,

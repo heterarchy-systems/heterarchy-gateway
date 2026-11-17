@@ -75,7 +75,7 @@ class ForgeLocationListCommandDto:
         Return:
             Empty typed location.list payload.
         """
-        result: ForgeLocationListPayloadDict = {}
+        result: ForgeLocationListPayloadDict = ForgeLocationListPayloadDict()
         return result
 
 
@@ -109,10 +109,10 @@ class ForgeWorkspaceListCommandDto:
         Return:
             Typed workspace.list operation payload.
         """
-        result: ForgeWorkspaceListPayloadDict = {
-            "location_id": str(self.location_id),
-            "expected_revision": self.expected_revision,
-        }
+        result: ForgeWorkspaceListPayloadDict = ForgeWorkspaceListPayloadDict(
+            location_id=str(self.location_id),
+            expected_revision=self.expected_revision,
+        )
         return result
 
 
@@ -150,12 +150,12 @@ class ForgeActivityListCommandDto:
         Return:
             Typed activity.list operation payload.
         """
-        result: ForgeActivityListPayloadDict = {
-            "locator": self.locator,
-            "workspace_id": str(self.workspace_id),
-            "workspace_revision": self.workspace_revision,
-            "limit": self.limit,
-        }
+        result: ForgeActivityListPayloadDict = ForgeActivityListPayloadDict(
+            locator=self.locator,
+            workspace_id=str(self.workspace_id),
+            workspace_revision=self.workspace_revision,
+            limit=self.limit,
+        )
         return result
 
 
@@ -191,10 +191,10 @@ class ForgeDagReadCurrentCommandDto:
         Return:
             Typed dag.read_current operation payload.
         """
-        result: ForgeDagReadCurrentPayloadDict = {
-            "scope": self.scope.to_dict(),
-            "goal_id": str(self.goal_id),
-        }
+        result: ForgeDagReadCurrentPayloadDict = ForgeDagReadCurrentPayloadDict(
+            scope=self.scope.to_dict(),
+            goal_id=str(self.goal_id),
+        )
         return result
 
 
@@ -247,16 +247,16 @@ class ForgeDagSettleCommandDto:
         Return:
             Typed dag.settle operation payload.
         """
-        result: ForgeDagSettlePayloadDict = {
-            "scope": self.scope.to_dict(),
-            "activity_id": str(self.activity_id),
-            "actor": self.actor.to_dict(),
-            "goal_id": str(self.goal_id),
-            "expected_goal_revision": self.expected_goal_revision,
-            "expected_dag_revision": self.expected_dag_revision,
-            "settlement_id": str(self.settlement_id),
-            "observed_at_ms": self.observed_at_ms,
-        }
+        result: ForgeDagSettlePayloadDict = ForgeDagSettlePayloadDict(
+            scope=self.scope.to_dict(),
+            activity_id=str(self.activity_id),
+            actor=self.actor.to_dict(),
+            goal_id=str(self.goal_id),
+            expected_goal_revision=self.expected_goal_revision,
+            expected_dag_revision=self.expected_dag_revision,
+            settlement_id=str(self.settlement_id),
+            observed_at_ms=self.observed_at_ms,
+        )
         return result
 
 
@@ -294,12 +294,12 @@ class ForgeLocationEntryDto:
         Return:
             Typed Location result object.
         """
-        result: ForgeLocationEntryDict = {
-            "location_id": self.location_id,
-            "display_name": self.display_name,
-            "revision": self.revision,
-            "state": self.state,
-        }
+        result: ForgeLocationEntryDict = ForgeLocationEntryDict(
+            location_id=self.location_id,
+            display_name=self.display_name,
+            revision=self.revision,
+            state=self.state,
+        )
         return result
 
 
@@ -332,9 +332,9 @@ class ForgeLocationListResultDto:
         Return:
             Typed Location list result.
         """
-        result: ForgeLocationListResultDict = {
-            "entries": [entry.to_dict() for entry in self.entries]
-        }
+        result: ForgeLocationListResultDict = ForgeLocationListResultDict(
+            entries=[entry.to_dict() for entry in self.entries]
+        )
         return result
 
 
@@ -372,12 +372,12 @@ class ForgeWorkspaceEntryDto:
         Return:
             Typed Workspace entry object.
         """
-        result: ForgeWorkspaceEntryDict = {
-            "locator": self.locator,
-            "display_name": self.display_name,
-            "workspace_id": self.workspace_id,
-            "workspace_revision": self.workspace_revision,
-        }
+        result: ForgeWorkspaceEntryDict = ForgeWorkspaceEntryDict(
+            locator=self.locator,
+            display_name=self.display_name,
+            workspace_id=self.workspace_id,
+            workspace_revision=self.workspace_revision,
+        )
         return result
 
 
@@ -410,9 +410,9 @@ class ForgeWorkspaceListResultDto:
         Return:
             Typed Workspace list result.
         """
-        result: ForgeWorkspaceListResultDict = {
-            "entries": [entry.to_dict() for entry in self.entries],
-        }
+        result: ForgeWorkspaceListResultDict = ForgeWorkspaceListResultDict(
+            entries=[entry.to_dict() for entry in self.entries],
+        )
         return result
 
 
@@ -448,11 +448,11 @@ class ForgeActivityScopeDto:
         Return:
             Typed Activity scope object.
         """
-        result: ForgeActivityScopeDict = {
-            "workspace_id": self.workspace_id,
-            "workspace_revision": self.workspace_revision,
-            "locator": self.locator,
-        }
+        result: ForgeActivityScopeDict = ForgeActivityScopeDict(
+            workspace_id=self.workspace_id,
+            workspace_revision=self.workspace_revision,
+            locator=self.locator,
+        )
         return result
 
 
@@ -502,18 +502,18 @@ class ForgeActivityProjectionDto:
         Return:
             Typed Activity projection object.
         """
-        result: ForgeActivityProjectionDict = {
-            "activity_id": self.activity_id,
-            "workspace_id": self.workspace_id,
-            "state": self.state,
-            "liveness": self.liveness,
-            "revision": self.revision,
-            "created_at_ms": self.created_at_ms,
-            "updated_at_ms": self.updated_at_ms,
-            "lease_owner_id": self.lease_owner_id,
-            "lease_until_ms": self.lease_until_ms,
-            "lease_revision": self.lease_revision,
-        }
+        result: ForgeActivityProjectionDict = ForgeActivityProjectionDict(
+            activity_id=self.activity_id,
+            workspace_id=self.workspace_id,
+            state=self.state,
+            liveness=self.liveness,
+            revision=self.revision,
+            created_at_ms=self.created_at_ms,
+            updated_at_ms=self.updated_at_ms,
+            lease_owner_id=self.lease_owner_id,
+            lease_until_ms=self.lease_until_ms,
+            lease_revision=self.lease_revision,
+        )
         return result
 
 
@@ -549,10 +549,10 @@ class ForgeActivityListResultDto:
         Return:
             Typed Activity list result.
         """
-        result: ForgeActivityListResultDict = {
-            "scope": self.scope.to_dict(),
-            "activities": [activity.to_dict() for activity in self.activities],
-        }
+        result: ForgeActivityListResultDict = ForgeActivityListResultDict(
+            scope=self.scope.to_dict(),
+            activities=[activity.to_dict() for activity in self.activities],
+        )
         return result
 
 
@@ -608,21 +608,21 @@ class ForgeDagNodeDto:
         Return:
             Typed DAG node object.
         """
-        result: ForgeDagNodeDict = {
-            "node_id": self.node_id,
-            "ordinal": self.ordinal,
-            "title": self.title,
-            "objective": self.objective,
-            "acceptance": list(self.acceptance),
-            "lifecycle": self.lifecycle,
-            "lifecycle_reason": self.lifecycle_reason,
-            "status": self.status,
-            "waiting_on": list(self.waiting_on),
-            "revision": self.revision,
-            "evidence_count": self.evidence_count,
-            "created_at_ms": self.created_at_ms,
-            "updated_at_ms": self.updated_at_ms,
-        }
+        result: ForgeDagNodeDict = ForgeDagNodeDict(
+            node_id=self.node_id,
+            ordinal=self.ordinal,
+            title=self.title,
+            objective=self.objective,
+            acceptance=list(self.acceptance),
+            lifecycle=self.lifecycle,
+            lifecycle_reason=self.lifecycle_reason,
+            status=self.status,
+            waiting_on=list(self.waiting_on),
+            revision=self.revision,
+            evidence_count=self.evidence_count,
+            created_at_ms=self.created_at_ms,
+            updated_at_ms=self.updated_at_ms,
+        )
         return result
 
 
@@ -653,10 +653,10 @@ class ForgeDagEdgeDto:
         Return:
             Typed DAG edge object.
         """
-        result: ForgeDagEdgeDict = {
-            "upstream": self.upstream,
-            "downstream": self.downstream,
-        }
+        result: ForgeDagEdgeDict = ForgeDagEdgeDict(
+            upstream=self.upstream,
+            downstream=self.downstream,
+        )
         return result
 
 
@@ -692,11 +692,11 @@ class ForgeDagLineageDto:
         Return:
             Typed DAG lineage object.
         """
-        result: ForgeDagLineageDict = {
-            "prior_node_id": self.prior_node_id,
-            "successor_node_id": self.successor_node_id,
-            "kind": self.kind,
-        }
+        result: ForgeDagLineageDict = ForgeDagLineageDict(
+            prior_node_id=self.prior_node_id,
+            successor_node_id=self.successor_node_id,
+            kind=self.kind,
+        )
         return result
 
 
@@ -750,21 +750,21 @@ class ForgeDagCurrentFoundResultDto:
         Return:
             Typed found current DAG result.
         """
-        result: ForgeDagCurrentFoundResultDict = {
-            "found": True,
-            "goal_id": self.goal_id,
-            "revision_id": self.revision_id,
-            "base_goal_revision": self.base_goal_revision,
-            "dag_revision": self.dag_revision,
-            "parent_revision": self.parent_revision,
-            "created_at_ms": self.created_at_ms,
-            "head_revision": self.head_revision,
-            "head_updated_at_ms": self.head_updated_at_ms,
-            "node_count": self.node_count,
-            "nodes": [node.to_dict() for node in self.nodes],
-            "edges": [edge.to_dict() for edge in self.edges],
-            "lineage": [item.to_dict() for item in self.lineage],
-        }
+        result: ForgeDagCurrentFoundResultDict = ForgeDagCurrentFoundResultDict(
+            found=True,
+            goal_id=self.goal_id,
+            revision_id=self.revision_id,
+            base_goal_revision=self.base_goal_revision,
+            dag_revision=self.dag_revision,
+            parent_revision=self.parent_revision,
+            created_at_ms=self.created_at_ms,
+            head_revision=self.head_revision,
+            head_updated_at_ms=self.head_updated_at_ms,
+            node_count=self.node_count,
+            nodes=[node.to_dict() for node in self.nodes],
+            edges=[edge.to_dict() for edge in self.edges],
+            lineage=[item.to_dict() for item in self.lineage],
+        )
         return result
 
 
@@ -780,7 +780,7 @@ class ForgeDagCurrentMissingResultDto:
         Return:
             Typed missing current DAG result.
         """
-        result: ForgeDagCurrentMissingResultDict = {"found": False}
+        result: ForgeDagCurrentMissingResultDict = ForgeDagCurrentMissingResultDict(found=False)
         return result
 
 
@@ -836,19 +836,19 @@ class ForgeDagSettleResultDto:
         Return:
             Typed DAG settlement result.
         """
-        result: ForgeDagSettleResultDict = {
-            "settlement_id": self.settlement_id,
-            "goal_id": self.goal_id,
-            "dag_revision": self.dag_revision,
-            "state": self.state,
-            "settled_at_ms": self.settled_at_ms,
-            "terminal_sink_node_ids": list(self.terminal_sink_node_ids),
-            "baseline_commit_oid": self.baseline_commit_oid,
-            "candidate_commit_oid": self.candidate_commit_oid,
-            "baseline_tree_blake3": self.baseline_tree_blake3,
-            "settled_tree_blake3": self.settled_tree_blake3,
-            "settled_file_count": self.settled_file_count,
-            "upserted_paths": list(self.upserted_paths),
-            "deleted_paths": list(self.deleted_paths),
-        }
+        result: ForgeDagSettleResultDict = ForgeDagSettleResultDict(
+            settlement_id=self.settlement_id,
+            goal_id=self.goal_id,
+            dag_revision=self.dag_revision,
+            state=self.state,
+            settled_at_ms=self.settled_at_ms,
+            terminal_sink_node_ids=list(self.terminal_sink_node_ids),
+            baseline_commit_oid=self.baseline_commit_oid,
+            candidate_commit_oid=self.candidate_commit_oid,
+            baseline_tree_blake3=self.baseline_tree_blake3,
+            settled_tree_blake3=self.settled_tree_blake3,
+            settled_file_count=self.settled_file_count,
+            upserted_paths=list(self.upserted_paths),
+            deleted_paths=list(self.deleted_paths),
+        )
         return result

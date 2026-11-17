@@ -30,7 +30,11 @@ from app.orchestration.schema.swarm.orchestration_swarm_state_schema import (
 from app.orchestration.schema.types.swarm_types import NonNilCanonicalSwarmUUID
 from app.orchestration.utils.orchestration_route_utils import orchestration_http_response
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
-from app.shared.types.http_types import ResponseModels
+from app.shared.types.http_types import (
+    ResponseModelDefinition,
+    ResponseModels,
+    build_response_models,
+)
 from app.shared.utils.query_validation import checked_query_filter
 
 router = APIRouter(
@@ -38,10 +42,14 @@ router = APIRouter(
     route_class=DishkaRoute,
 )
 
-_CREATE_RUN_RESPONSES: ResponseModels = {
-    **ORCHESTRATION_ERROR_RESPONSES,
-    status.HTTP_200_OK: {"model": CreateSwarmRunResponse},
-}
+_CREATE_RUN_RESPONSES: ResponseModels = ORCHESTRATION_ERROR_RESPONSES | build_response_models(
+    definitions=(
+        ResponseModelDefinition(
+            status_code=status.HTTP_200_OK,
+            model=CreateSwarmRunResponse,
+        ),
+    )
+)
 
 
 @router.post(

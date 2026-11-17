@@ -15,6 +15,7 @@ from app.forge.application.inner_dto.types.forge_swarm_types import (
     ForgeSwarmConvergedResponseDict,
     ForgeSwarmConvergenceCandidateDict,
     ForgeSwarmConvergePayloadDict,
+    ForgeSwarmDagNodeHybridTargetDict,
     ForgeSwarmMaterializeHybridPayloadDict,
     ForgeSwarmMemberCapturePayloadDict,
     ForgeSwarmMemberOutputResponseDict,
@@ -27,6 +28,7 @@ from app.forge.application.inner_dto.types.forge_swarm_types import (
     ForgeSwarmSettlementReceiptResponseDict,
     ForgeSwarmSettlePayloadDict,
     ForgeSwarmSettleResponseDict,
+    ForgeSwarmStandaloneTargetDict,
     ForgeSwarmTargetDict,
     ForgeSwarmWorkspaceGetPayloadDict,
     ForgeSwarmWorkspaceGetResponseDict,
@@ -90,16 +92,16 @@ class ForgeSwarmTargetDto:
             Standalone or DAG node hybrid target dictionary.
         """
         if self.kind is SwarmTargetKindEnum.STANDALONE_SWARM:
-            result: ForgeSwarmTargetDict = {"kind": self.kind.value}
+            result: ForgeSwarmTargetDict = ForgeSwarmStandaloneTargetDict(kind=self.kind.value)
             return result
         if self.goal_id is None or self.dag_revision is None or self.node_id is None:
             raise ValueError("DAG node hybrid target requires goal, revision, and node identities")
-        result = {
-            "kind": self.kind.value,
-            "goal_id": str(self.goal_id),
-            "dag_revision": self.dag_revision,
-            "node_id": str(self.node_id),
-        }
+        result = ForgeSwarmDagNodeHybridTargetDict(
+            kind=self.kind.value,
+            goal_id=str(self.goal_id),
+            dag_revision=self.dag_revision,
+            node_id=str(self.node_id),
+        )
         return result
 
 
@@ -178,16 +180,16 @@ class ForgeSwarmWorkspaceProvisionCommandDto:
         Return:
             Closed `swarm.workspace_provision` payload dictionary.
         """
-        result: ForgeSwarmWorkspaceProvisionPayloadDict = {
-            "scope": self.scope,
-            "actor": self.actor,
-            "swarm_run_id": str(self.swarm_run_id),
-            "member_id": str(self.member_id),
-            "mode": self.mode.value,
-            "target": self.target.to_dict(),
-            "candidate_commit_oid": self.candidate_commit_oid,
-            "observed_at_ms": self.observed_at_ms,
-        }
+        result: ForgeSwarmWorkspaceProvisionPayloadDict = ForgeSwarmWorkspaceProvisionPayloadDict(
+            scope=self.scope,
+            actor=self.actor,
+            swarm_run_id=str(self.swarm_run_id),
+            member_id=str(self.member_id),
+            mode=self.mode.value,
+            target=self.target.to_dict(),
+            candidate_commit_oid=self.candidate_commit_oid,
+            observed_at_ms=self.observed_at_ms,
+        )
         return result
 
 
@@ -224,11 +226,11 @@ class ForgeSwarmWorkspaceGetCommandDto:
         Return:
             Closed `swarm.workspace_get` payload dictionary.
         """
-        result: ForgeSwarmWorkspaceGetPayloadDict = {
-            "scope": self.scope,
-            "swarm_run_id": str(self.swarm_run_id),
-            "member_id": str(self.member_id),
-        }
+        result: ForgeSwarmWorkspaceGetPayloadDict = ForgeSwarmWorkspaceGetPayloadDict(
+            scope=self.scope,
+            swarm_run_id=str(self.swarm_run_id),
+            member_id=str(self.member_id),
+        )
         return result
 
 
@@ -275,13 +277,13 @@ class ForgeSwarmMemberCaptureCommandDto:
         Return:
             Closed `swarm.member_capture` payload dictionary.
         """
-        result: ForgeSwarmMemberCapturePayloadDict = {
-            "scope": self.scope,
-            "actor": self.actor,
-            "swarm_run_id": str(self.swarm_run_id),
-            "member_id": str(self.member_id),
-            "captured_at_ms": self.captured_at_ms,
-        }
+        result: ForgeSwarmMemberCapturePayloadDict = ForgeSwarmMemberCapturePayloadDict(
+            scope=self.scope,
+            actor=self.actor,
+            swarm_run_id=str(self.swarm_run_id),
+            member_id=str(self.member_id),
+            captured_at_ms=self.captured_at_ms,
+        )
         return result
 
 
@@ -301,7 +303,9 @@ class ForgeSwarmConvergenceCandidateDto:
         Return:
             Closed candidate payload with absent optional members omitted.
         """
-        result: ForgeSwarmConvergenceCandidateDict = {"member_id": str(self.member_id)}
+        result: ForgeSwarmConvergenceCandidateDict = ForgeSwarmConvergenceCandidateDict(
+            member_id=str(self.member_id)
+        )
         if self.expected_output_commit_oid is not None:
             result["expected_output_commit_oid"] = self.expected_output_commit_oid
         if self.expected_diff_digest is not None:
@@ -360,13 +364,13 @@ class ForgeSwarmConvergeCommandDto:
         Return:
             Closed `swarm.converge` payload dictionary.
         """
-        result: ForgeSwarmConvergePayloadDict = {
-            "scope": self.scope,
-            "actor": self.actor,
-            "swarm_run_id": str(self.swarm_run_id),
-            "candidates": [candidate.to_dict() for candidate in self.candidates],
-            "observed_at_ms": self.observed_at_ms,
-        }
+        result: ForgeSwarmConvergePayloadDict = ForgeSwarmConvergePayloadDict(
+            scope=self.scope,
+            actor=self.actor,
+            swarm_run_id=str(self.swarm_run_id),
+            candidates=[candidate.to_dict() for candidate in self.candidates],
+            observed_at_ms=self.observed_at_ms,
+        )
         return result
 
 
@@ -421,17 +425,17 @@ class ForgeSwarmSettleCommandDto:
         Return:
             Closed `swarm.settle` payload dictionary.
         """
-        result: ForgeSwarmSettlePayloadDict = {
-            "scope": self.scope,
-            "activity_id": str(self.activity_id) if self.activity_id is not None else None,
-            "actor": self.actor,
-            "coordinator_agent_id": str(self.coordinator_agent_id),
-            "swarm_run_id": str(self.swarm_run_id),
-            "settlement_id": str(self.settlement_id),
-            "converged_commit_oid": self.converged_commit_oid,
-            "expected_diff_digest": self.expected_diff_digest,
-            "settled_at_ms": self.settled_at_ms,
-        }
+        result: ForgeSwarmSettlePayloadDict = ForgeSwarmSettlePayloadDict(
+            scope=self.scope,
+            activity_id=str(self.activity_id) if self.activity_id is not None else None,
+            actor=self.actor,
+            coordinator_agent_id=str(self.coordinator_agent_id),
+            swarm_run_id=str(self.swarm_run_id),
+            settlement_id=str(self.settlement_id),
+            converged_commit_oid=self.converged_commit_oid,
+            expected_diff_digest=self.expected_diff_digest,
+            settled_at_ms=self.settled_at_ms,
+        )
         return result
 
 
@@ -492,20 +496,20 @@ class ForgeSwarmMaterializeHybridCommandDto:
         Return:
             Closed `swarm.materialize_hybrid` payload dictionary.
         """
-        result: ForgeSwarmMaterializeHybridPayloadDict = {
-            "scope": self.scope,
-            "activity_id": str(self.activity_id),
-            "actor": self.actor,
-            "swarm_run_id": str(self.swarm_run_id),
-            "settlement_id": str(self.settlement_id),
-            "goal_id": str(self.goal_id),
-            "expected_goal_revision": self.expected_goal_revision,
-            "expected_dag_revision": self.expected_dag_revision,
-            "node_id": str(self.node_id),
-            "converged_commit_oid": self.converged_commit_oid,
-            "expected_diff_digest": self.expected_diff_digest,
-            "settled_at_ms": self.settled_at_ms,
-        }
+        result: ForgeSwarmMaterializeHybridPayloadDict = ForgeSwarmMaterializeHybridPayloadDict(
+            scope=self.scope,
+            activity_id=str(self.activity_id),
+            actor=self.actor,
+            swarm_run_id=str(self.swarm_run_id),
+            settlement_id=str(self.settlement_id),
+            goal_id=str(self.goal_id),
+            expected_goal_revision=self.expected_goal_revision,
+            expected_dag_revision=self.expected_dag_revision,
+            node_id=str(self.node_id),
+            converged_commit_oid=self.converged_commit_oid,
+            expected_diff_digest=self.expected_diff_digest,
+            settled_at_ms=self.settled_at_ms,
+        )
         return result
 
 
@@ -541,10 +545,10 @@ class ForgeSwarmSettlementGetCommandDto:
         Return:
             Closed `swarm.settlement_get` payload dictionary.
         """
-        result: ForgeSwarmSettlementGetPayloadDict = {
-            "scope": self.scope,
-            "swarm_run_id": str(self.swarm_run_id),
-        }
+        result: ForgeSwarmSettlementGetPayloadDict = ForgeSwarmSettlementGetPayloadDict(
+            scope=self.scope,
+            swarm_run_id=str(self.swarm_run_id),
+        )
         return result
 
 
@@ -583,11 +587,11 @@ class ForgeSwarmPurgeCommandDto:
         Return:
             Closed `swarm.purge` payload dictionary.
         """
-        result: ForgeSwarmPurgePayloadDict = {
-            "scope": self.scope,
-            "actor": self.actor,
-            "swarm_run_id": str(self.swarm_run_id),
-        }
+        result: ForgeSwarmPurgePayloadDict = ForgeSwarmPurgePayloadDict(
+            scope=self.scope,
+            actor=self.actor,
+            swarm_run_id=str(self.swarm_run_id),
+        )
         return result
 
 
@@ -642,19 +646,19 @@ class ForgeSwarmMemberOutputInnerDto:
         Return:
             Complete member output response dictionary.
         """
-        result: ForgeSwarmMemberOutputResponseDict = {
-            "swarm_run_id": self.swarm_run_id,
-            "member_id": self.member_id,
-            "mode": self.mode,
-            "input_commit_oid": self.input_commit_oid,
-            "output_commit_oid": self.output_commit_oid,
-            "initial_tree_blake3": self.initial_tree_blake3,
-            "final_tree_blake3": self.final_tree_blake3,
-            "final_file_count": self.final_file_count,
-            "changed_paths": list(self.changed_paths),
-            "diff_digest": self.diff_digest,
-            "captured_at_ms": self.captured_at_ms,
-        }
+        result: ForgeSwarmMemberOutputResponseDict = ForgeSwarmMemberOutputResponseDict(
+            swarm_run_id=self.swarm_run_id,
+            member_id=self.member_id,
+            mode=self.mode,
+            input_commit_oid=self.input_commit_oid,
+            output_commit_oid=self.output_commit_oid,
+            initial_tree_blake3=self.initial_tree_blake3,
+            final_tree_blake3=self.final_tree_blake3,
+            final_file_count=self.final_file_count,
+            changed_paths=list(self.changed_paths),
+            diff_digest=self.diff_digest,
+            captured_at_ms=self.captured_at_ms,
+        )
         return result
 
 
@@ -716,18 +720,18 @@ class ForgeSwarmWorkspaceReceiptInnerDto:
         completed = self.completed
         if completed is not None:
             completed = completed.to_dict()
-        result: ForgeSwarmWorkspaceReceiptResponseDict = {
-            "swarm_run_id": self.swarm_run_id,
-            "member_id": self.member_id,
-            "mode": self.mode,
-            "target": self.target.to_dict(),
-            "worktree_path": self.worktree_path,
-            "provisioned_at_ms": self.provisioned_at_ms,
-            "initial_tree_blake3": self.initial_tree_blake3,
-            "initial_file_count": self.initial_file_count,
-            "input_commit_oid": self.input_commit_oid,
-            "completed": completed,
-        }
+        result: ForgeSwarmWorkspaceReceiptResponseDict = ForgeSwarmWorkspaceReceiptResponseDict(
+            swarm_run_id=self.swarm_run_id,
+            member_id=self.member_id,
+            mode=self.mode,
+            target=self.target.to_dict(),
+            worktree_path=self.worktree_path,
+            provisioned_at_ms=self.provisioned_at_ms,
+            initial_tree_blake3=self.initial_tree_blake3,
+            initial_file_count=self.initial_file_count,
+            input_commit_oid=self.input_commit_oid,
+            completed=completed,
+        )
         return result
 
 
@@ -779,13 +783,13 @@ class ForgeSwarmWorkspaceGetInnerDto:
         receipt = self.receipt
         if receipt is not None:
             receipt = receipt.to_dict()
-        result: ForgeSwarmWorkspaceGetResponseDict = {
-            "workspace_id": self.workspace_id,
-            "swarm_run_id": self.swarm_run_id,
-            "member_id": self.member_id,
-            "found": self.found,
-            "receipt": receipt,
-        }
+        result: ForgeSwarmWorkspaceGetResponseDict = ForgeSwarmWorkspaceGetResponseDict(
+            workspace_id=self.workspace_id,
+            swarm_run_id=self.swarm_run_id,
+            member_id=self.member_id,
+            found=self.found,
+            receipt=receipt,
+        )
         return result
 
 
@@ -807,14 +811,14 @@ class ForgeSwarmConvergedInnerDto:
         Return:
             Closed converged result dictionary.
         """
-        result: ForgeSwarmConvergedResponseDict = {
-            "status": SwarmConvergenceStatusEnum.CONVERGED.value,
-            "swarm_run_id": self.swarm_run_id,
-            "converged_commit_oid": self.converged_commit_oid,
-            "converged_tree_blake3": self.converged_tree_blake3,
-            "converged_diff_digest": self.converged_diff_digest,
-            "changed_files": list(self.changed_files),
-        }
+        result: ForgeSwarmConvergedResponseDict = ForgeSwarmConvergedResponseDict(
+            status=SwarmConvergenceStatusEnum.CONVERGED.value,
+            swarm_run_id=self.swarm_run_id,
+            converged_commit_oid=self.converged_commit_oid,
+            converged_tree_blake3=self.converged_tree_blake3,
+            converged_diff_digest=self.converged_diff_digest,
+            changed_files=list(self.changed_files),
+        )
         return result
 
 
@@ -834,12 +838,12 @@ class ForgeSwarmConflictInnerDto:
         Return:
             Closed conflict result dictionary.
         """
-        result: ForgeSwarmConflictResponseDict = {
-            "status": SwarmConvergenceStatusEnum.CONFLICT.value,
-            "swarm_run_id": self.swarm_run_id,
-            "conflicting_member_id": self.conflicting_member_id,
-            "details": list(self.details),
-        }
+        result: ForgeSwarmConflictResponseDict = ForgeSwarmConflictResponseDict(
+            status=SwarmConvergenceStatusEnum.CONFLICT.value,
+            swarm_run_id=self.swarm_run_id,
+            conflicting_member_id=self.conflicting_member_id,
+            details=list(self.details),
+        )
         return result
 
 
@@ -926,21 +930,21 @@ class ForgeSwarmSettlementReceiptInnerDto:
         Return:
             Complete settlement receipt response dictionary.
         """
-        result: ForgeSwarmSettlementReceiptResponseDict = {
-            "settlement_id": self.settlement_id,
-            "swarm_run_id": self.swarm_run_id,
-            "target": self.target.to_dict(),
-            "state": self.state,
-            "settled_at_ms": self.settled_at_ms,
-            "baseline_commit_oid": self.baseline_commit_oid,
-            "converged_commit_oid": self.converged_commit_oid,
-            "baseline_tree_blake3": self.baseline_tree_blake3,
-            "settled_tree_blake3": self.settled_tree_blake3,
-            "converged_diff_digest": self.converged_diff_digest,
-            "settled_file_count": self.settled_file_count,
-            "upserted_paths": list(self.upserted_paths),
-            "deleted_paths": list(self.deleted_paths),
-        }
+        result: ForgeSwarmSettlementReceiptResponseDict = ForgeSwarmSettlementReceiptResponseDict(
+            settlement_id=self.settlement_id,
+            swarm_run_id=self.swarm_run_id,
+            target=self.target.to_dict(),
+            state=self.state,
+            settled_at_ms=self.settled_at_ms,
+            baseline_commit_oid=self.baseline_commit_oid,
+            converged_commit_oid=self.converged_commit_oid,
+            baseline_tree_blake3=self.baseline_tree_blake3,
+            settled_tree_blake3=self.settled_tree_blake3,
+            converged_diff_digest=self.converged_diff_digest,
+            settled_file_count=self.settled_file_count,
+            upserted_paths=list(self.upserted_paths),
+            deleted_paths=list(self.deleted_paths),
+        )
         return result
 
 
@@ -974,10 +978,10 @@ class ForgeSwarmSettleInnerDto:
         Return:
             Complete settlement result response dictionary.
         """
-        result: ForgeSwarmSettleResponseDict = {
-            "receipt": self.receipt.to_dict(),
-            "outbox_sequence": self.outbox_sequence,
-        }
+        result: ForgeSwarmSettleResponseDict = ForgeSwarmSettleResponseDict(
+            receipt=self.receipt.to_dict(),
+            outbox_sequence=self.outbox_sequence,
+        )
         return result
 
 
@@ -1030,19 +1034,19 @@ class ForgeSwarmSettledEffectFactInnerDto:
         Return:
             Complete effect fact response dictionary.
         """
-        result: ForgeSwarmSettledEffectFactResponseDict = {
-            "kind": "swarm_settled",
-            "settlement_id": self.settlement_id,
-            "workspace_id": self.workspace_id,
-            "activity_id": self.activity_id,
-            "swarm_run_id": self.swarm_run_id,
-            "settled_file_count": self.settled_file_count,
-            "settled_tree_digest": self.settled_tree_digest,
-            "converged_diff_digest": self.converged_diff_digest,
-            "coordinator_agent_id": self.coordinator_agent_id,
-            "coordinator_session_id": self.coordinator_session_id,
-            "settled_at_ms": self.settled_at_ms,
-        }
+        result: ForgeSwarmSettledEffectFactResponseDict = ForgeSwarmSettledEffectFactResponseDict(
+            kind="swarm_settled",
+            settlement_id=self.settlement_id,
+            workspace_id=self.workspace_id,
+            activity_id=self.activity_id,
+            swarm_run_id=self.swarm_run_id,
+            settled_file_count=self.settled_file_count,
+            settled_tree_digest=self.settled_tree_digest,
+            converged_diff_digest=self.converged_diff_digest,
+            coordinator_agent_id=self.coordinator_agent_id,
+            coordinator_session_id=self.coordinator_session_id,
+            settled_at_ms=self.settled_at_ms,
+        )
         return result
 
 
@@ -1085,13 +1089,13 @@ class ForgeSwarmSettledOutboxEntryInnerDto:
         Return:
             Complete outbox entry response dictionary.
         """
-        result: ForgeSwarmSettledOutboxEntryResponseDict = {
-            "sequence": self.sequence,
-            "migration_id": self.migration_id,
-            "destination_id": self.destination_id,
-            "workspace_id": self.workspace_id,
-            "fact": self.fact.to_dict(),
-        }
+        result: ForgeSwarmSettledOutboxEntryResponseDict = ForgeSwarmSettledOutboxEntryResponseDict(
+            sequence=self.sequence,
+            migration_id=self.migration_id,
+            destination_id=self.destination_id,
+            workspace_id=self.workspace_id,
+            fact=self.fact.to_dict(),
+        )
         return result
 
 
@@ -1150,12 +1154,12 @@ class ForgeSwarmSettlementGetInnerDto:
         outbox_entry = self.outbox_entry
         if outbox_entry is not None:
             outbox_entry = outbox_entry.to_dict()
-        result: ForgeSwarmSettlementGetResponseDict = {
-            "workspace_id": self.workspace_id,
-            "swarm_run_id": self.swarm_run_id,
-            "receipt": receipt,
-            "outbox_entry": outbox_entry,
-        }
+        result: ForgeSwarmSettlementGetResponseDict = ForgeSwarmSettlementGetResponseDict(
+            workspace_id=self.workspace_id,
+            swarm_run_id=self.swarm_run_id,
+            receipt=receipt,
+            outbox_entry=outbox_entry,
+        )
         return result
 
 
@@ -1191,9 +1195,9 @@ class ForgeSwarmPurgeInnerDto:
         Return:
             Complete purge response dictionary.
         """
-        result: ForgeSwarmPurgeResponseDict = {
-            "workspace_id": self.workspace_id,
-            "swarm_run_id": self.swarm_run_id,
-            "purged": self.purged,
-        }
+        result: ForgeSwarmPurgeResponseDict = ForgeSwarmPurgeResponseDict(
+            workspace_id=self.workspace_id,
+            swarm_run_id=self.swarm_run_id,
+            purged=self.purged,
+        )
         return result

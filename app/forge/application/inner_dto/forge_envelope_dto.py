@@ -18,6 +18,7 @@ from app.forge.application.inner_dto.types.forge_envelope_types import (
     ForgeSuccessEnvelopeDict,
     ForgeSwarmSettlementReadbackDict,
     ForgeSwarmWorkspaceReadbackDict,
+    ForgeWireErrorDict,
     ForgeWorkspaceScopeDict,
 )
 from app.forge.schema.types.forge_types import Int64
@@ -45,11 +46,11 @@ class ForgeLocatorDto:
         Return:
             Typed locator object.
         """
-        result: ForgeLocatorDict = {
-            "location_id": str(self.location_id),
-            "expected_revision": self.expected_revision,
-            "relative_root": self.relative_root,
-        }
+        result: ForgeLocatorDict = ForgeLocatorDict(
+            location_id=str(self.location_id),
+            expected_revision=self.expected_revision,
+            relative_root=self.relative_root,
+        )
         return result
 
 
@@ -69,12 +70,12 @@ class ForgeSwarmWorkspaceReadbackDto:
         Return:
             Typed Swarm workspace readback key.
         """
-        result: ForgeSwarmWorkspaceReadbackDict = {
-            "kind": ForgeReadbackKindEnum.SWARM_WORKSPACE,
-            "workspace_id": self.workspace_id,
-            "swarm_run_id": self.swarm_run_id,
-            "member_id": self.member_id,
-        }
+        result: ForgeSwarmWorkspaceReadbackDict = ForgeSwarmWorkspaceReadbackDict(
+            kind=ForgeReadbackKindEnum.SWARM_WORKSPACE,
+            workspace_id=self.workspace_id,
+            swarm_run_id=self.swarm_run_id,
+            member_id=self.member_id,
+        )
         return result
 
 
@@ -94,12 +95,12 @@ class ForgeSwarmSettlementReadbackDto:
         Return:
             Typed Swarm settlement readback key.
         """
-        result: ForgeSwarmSettlementReadbackDict = {
-            "kind": ForgeReadbackKindEnum.SWARM_SETTLEMENT,
-            "workspace_id": self.workspace_id,
-            "swarm_run_id": self.swarm_run_id,
-            "settlement_id": self.settlement_id,
-        }
+        result: ForgeSwarmSettlementReadbackDict = ForgeSwarmSettlementReadbackDict(
+            kind=ForgeReadbackKindEnum.SWARM_SETTLEMENT,
+            workspace_id=self.workspace_id,
+            swarm_run_id=self.swarm_run_id,
+            settlement_id=self.settlement_id,
+        )
         return result
 
 
@@ -127,15 +128,15 @@ class ForgeWireErrorDto:
             Typed Forge error details.
         """
         readback = _readback_to_dict(readback=self.readback)
-        result: ForgeErrorDtoDict = {
-            "code": self.code,
-            "message": self.message,
-            "category": self.category,
-            "retryable": self.retryable,
-            "recovery_action": self.recovery_action,
-            "recovery_hint": self.recovery_hint,
-            "readback": readback,
-        }
+        result: ForgeErrorDtoDict = ForgeWireErrorDict(
+            code=self.code,
+            message=self.message,
+            category=self.category,
+            retryable=self.retryable,
+            recovery_action=self.recovery_action,
+            recovery_hint=self.recovery_hint,
+            readback=readback,
+        )
         return result
 
 
@@ -155,11 +156,11 @@ class ForgeWorkspaceScopeDto:
         Return:
             Typed Workspace scope object.
         """
-        result: ForgeWorkspaceScopeDict = {
-            "workspace_id": str(self.workspace_id),
-            "workspace_revision": self.workspace_revision,
-            "locator": self.locator.to_dict(),
-        }
+        result: ForgeWorkspaceScopeDict = ForgeWorkspaceScopeDict(
+            workspace_id=str(self.workspace_id),
+            workspace_revision=self.workspace_revision,
+            locator=self.locator.to_dict(),
+        )
         return result
 
 
@@ -179,7 +180,7 @@ class ForgePrincipalDto:
         Return:
             Typed principal object.
         """
-        result: ForgePrincipalDict = {"kind": self.kind.value}
+        result: ForgePrincipalDict = ForgePrincipalDict(kind=self.kind.value)
         if self.token_id is not None:
             result["token_id"] = str(self.token_id)
         if self.grant_id is not None:
@@ -203,11 +204,11 @@ class ForgeSessionActorDto:
         Return:
             Typed session actor object.
         """
-        result: ForgeSessionActorDict = {
-            "session_id": str(self.session_id),
-            "principal": self.principal.to_dict(),
-            "workspace_id": str(self.workspace_id),
-        }
+        result: ForgeSessionActorDict = ForgeSessionActorDict(
+            session_id=str(self.session_id),
+            principal=self.principal.to_dict(),
+            workspace_id=str(self.workspace_id),
+        )
         return result
 
 
@@ -228,12 +229,12 @@ class ForgeCommandEnvelopeDto:
         Return:
             Complete typed Forge request envelope.
         """
-        result: ForgeCommandEnvelopeDict = {
-            "forge_api": self.forge_api,
-            "request_id": str(self.request_id),
-            "op": self.op.value,
-            "payload": self.payload,
-        }
+        result: ForgeCommandEnvelopeDict = ForgeCommandEnvelopeDict(
+            forge_api=self.forge_api,
+            request_id=str(self.request_id),
+            op=self.op.value,
+            payload=self.payload,
+        )
         return result
 
 
@@ -253,12 +254,12 @@ class ForgeCommandSuccessEnvelopeDto[ResultDictT]:
         Return:
             Typed successful response envelope.
         """
-        result: ForgeSuccessEnvelopeDict[ResultDictT] = {
-            "forge_api": self.forge_api,
-            "request_id": self.request_id,
-            "ok": True,
-            "result": self.result,
-        }
+        result: ForgeSuccessEnvelopeDict[ResultDictT] = ForgeSuccessEnvelopeDict(
+            forge_api=self.forge_api,
+            request_id=self.request_id,
+            ok=True,
+            result=self.result,
+        )
         return result
 
 
@@ -278,12 +279,12 @@ class ForgeCommandFailureEnvelopeDto:
         Return:
             Typed failed response envelope.
         """
-        result: ForgeFailureEnvelopeDict = {
-            "forge_api": self.forge_api,
-            "request_id": self.request_id,
-            "ok": False,
-            "error": self.error.to_dict(),
-        }
+        result: ForgeFailureEnvelopeDict = ForgeFailureEnvelopeDict(
+            forge_api=self.forge_api,
+            request_id=self.request_id,
+            ok=False,
+            error=self.error.to_dict(),
+        )
         return result
 
 
@@ -311,10 +312,10 @@ class ForgeCommandOutcomeDto[ResultDictT]:
             response: ForgeCommandResponseDict[ResultDictT] = self.response.to_dict()
         else:
             response = self.response.to_dict()
-        result: ForgeCommandOutcomeDict[ResultDictT] = {
-            "status_code": self.status_code,
-            "response": response,
-        }
+        result: ForgeCommandOutcomeDict[ResultDictT] = ForgeCommandOutcomeDict(
+            status_code=self.status_code,
+            response=response,
+        )
         return result
 
 

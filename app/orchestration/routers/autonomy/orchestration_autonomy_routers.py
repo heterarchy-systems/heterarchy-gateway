@@ -42,9 +42,36 @@ from app.shared.filter_module.autonomy_filter import (
     DagSettlementGovernanceFilter,
     ExecutionSnapshotFilter,
 )
+from app.shared.types.http_types import (
+    ResponseModelDefinition,
+    ResponseModels,
+    build_response_models,
+)
 from app.shared.utils.query_validation import checked_query_filter
 
 router = APIRouter(prefix="/workspaces", route_class=DishkaRoute)
+_REVIEWER_OPERATION_RESPONSES: ResponseModels = (
+    ORCHESTRATION_ERROR_RESPONSES
+    | build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_409_CONFLICT,
+                model=ReviewerOperationResponse | OrchestrationBackendErrorResponse,
+            ),
+        )
+    )
+)
+_EXECUTION_SNAPSHOT_RESPONSES: ResponseModels = (
+    ORCHESTRATION_ERROR_RESPONSES
+    | build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_409_CONFLICT,
+                model=ExecutionSnapshotOutcomeResponse | OrchestrationBackendErrorResponse,
+            ),
+        )
+    )
+)
 
 
 @router.get(
@@ -110,12 +137,7 @@ async def fetch_workspace_scope_route(
 @router.post(
     "/{workspace_id}/reviewer-assignments",
     response_model=ReviewerOperationResponse | OrchestrationBackendErrorResponse,
-    responses=ORCHESTRATION_ERROR_RESPONSES
-    | {
-        status.HTTP_409_CONFLICT: {
-            "model": ReviewerOperationResponse | OrchestrationBackendErrorResponse
-        }
-    },
+    responses=_REVIEWER_OPERATION_RESPONSES,
 )
 async def assign_reviewer_route(
     workspace_id: UUID,
@@ -138,12 +160,7 @@ async def assign_reviewer_route(
 @router.post(
     "/{workspace_id}/reviewer-verdicts",
     response_model=ReviewerOperationResponse | OrchestrationBackendErrorResponse,
-    responses=ORCHESTRATION_ERROR_RESPONSES
-    | {
-        status.HTTP_409_CONFLICT: {
-            "model": ReviewerOperationResponse | OrchestrationBackendErrorResponse
-        }
-    },
+    responses=_REVIEWER_OPERATION_RESPONSES,
 )
 async def record_reviewer_verdict_route(
     workspace_id: UUID,
@@ -166,12 +183,7 @@ async def record_reviewer_verdict_route(
 @router.post(
     "/{workspace_id}/node-completion-gate",
     response_model=ReviewerOperationResponse | OrchestrationBackendErrorResponse,
-    responses=ORCHESTRATION_ERROR_RESPONSES
-    | {
-        status.HTTP_409_CONFLICT: {
-            "model": ReviewerOperationResponse | OrchestrationBackendErrorResponse
-        }
-    },
+    responses=_REVIEWER_OPERATION_RESPONSES,
 )
 async def verify_node_completion_gate_route(
     workspace_id: UUID,
@@ -194,12 +206,7 @@ async def verify_node_completion_gate_route(
 @router.post(
     "/{workspace_id}/execution-snapshots",
     response_model=ExecutionSnapshotOutcomeResponse | OrchestrationBackendErrorResponse,
-    responses=ORCHESTRATION_ERROR_RESPONSES
-    | {
-        status.HTTP_409_CONFLICT: {
-            "model": ExecutionSnapshotOutcomeResponse | OrchestrationBackendErrorResponse
-        }
-    },
+    responses=_EXECUTION_SNAPSHOT_RESPONSES,
 )
 async def prepare_execution_snapshot_route(
     workspace_id: UUID,
