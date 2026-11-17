@@ -15,13 +15,15 @@ from app.orchestration.application.inner_dto.autonomy_reviewer_inner_dto import 
     ResolvedAuthorDto,
     ReviewerAssignmentDto,
     ReviewerCandidateDto,
-    ReviewerOperationResponseDict,
     ReviewerOperationResponseDto,
     VerifyNodeCompletionGateCommandDto,
     WorkCorrelationDto,
 )
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
+)
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_reviewer_types import (
+    ReviewerOperationResponseDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,

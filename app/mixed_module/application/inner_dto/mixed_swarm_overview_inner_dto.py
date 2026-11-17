@@ -3,25 +3,18 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from typing_extensions import TypedDict
-
-from app.forge.application.forge_swarm_dto import ForgeSwarmSettlementGetResponseDict
 from app.forge.application.inner_dto.forge_envelope_dto import (
     ForgeCommandSuccessEnvelopeDto,
-    ForgeSuccessEnvelopeDict,
 )
-from app.orchestration.application.inner_dto.swarm_run_inner_dto import (
+from app.forge.application.inner_dto.types.forge_swarm_types import (
+    ForgeSwarmSettlementGetResponseDict,
+)
+from app.mixed_module.application.inner_dto.types.mixed_swarm_overview_types import (
+    MixedSwarmOverviewDict,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_run_types import (
     SwarmRunInspectionResponseDict,
 )
-
-
-class MixedSwarmOverviewDict(TypedDict, total=True, closed=True):
-    """Complete JSON response for the Mixed Swarm overview."""
-
-    workspaceId: UUID
-    swarmRunId: UUID
-    forge: ForgeSuccessEnvelopeDict[ForgeSwarmSettlementGetResponseDict]
-    orchestration: SwarmRunInspectionResponseDict
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

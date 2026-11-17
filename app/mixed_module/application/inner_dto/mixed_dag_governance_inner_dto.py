@@ -3,26 +3,18 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from typing_extensions import TypedDict
-
-from app.forge.application.forge_workspace_dto import ForgeDagCurrentResultDict
 from app.forge.application.inner_dto.forge_envelope_dto import (
     ForgeCommandSuccessEnvelopeDto,
-    ForgeSuccessEnvelopeDict,
 )
-from app.orchestration.application.inner_dto.autonomy_settlement_inner_dto import (
+from app.forge.application.inner_dto.types.forge_workspace_types import (
+    ForgeDagCurrentResultDict,
+)
+from app.mixed_module.application.inner_dto.types.mixed_dag_governance_types import (
+    MixedDagGovernanceDict,
+)
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_settlement_types import (
     DagSettlementGovernanceResponseDict,
 )
-
-
-class MixedDagGovernanceDict(TypedDict, total=True, closed=True):
-    """Complete typed response for the Mixed DAG governance view."""
-
-    workspaceId: UUID
-    goalId: UUID
-    forgeRequestId: UUID
-    forge: ForgeSuccessEnvelopeDict[ForgeDagCurrentResultDict]
-    governance: DagSettlementGovernanceResponseDict
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

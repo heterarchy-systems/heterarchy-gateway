@@ -3,53 +3,17 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from typing_extensions import TypedDict
-
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_scope_types import (
+    RegisteredWorkspaceScopeDict,
+    WorkspaceQueryScopeDict,
+    WorkspaceScopeQueryResponseDict,
+    WorkspaceScopeRegisterRequestDict,
+)
 from app.orchestration.schema.types.autonomy_types import (
     PositiveInt64,
     UnixTimestampMs,
     UnsignedRevision,
 )
-
-
-class WorkspaceQueryScopeDict(TypedDict, total=True, closed=True):
-    """Complete camelCase scope request dictionary."""
-
-    workspaceId: str
-    locationId: str
-    locationRevision: PositiveInt64
-    workspaceRevision: PositiveInt64
-    locator: str
-
-
-class WorkspaceScopeRegisterRequestDict(TypedDict, total=True, closed=True):
-    """Complete camelCase scope registration request dictionary."""
-
-    requestId: str
-    expectedRevision: UnsignedRevision
-    scope: WorkspaceQueryScopeDict
-
-
-class RegisteredWorkspaceScopeDict(TypedDict, total=True, closed=True):
-    """Complete registered scope response dictionary."""
-
-    workspaceId: str
-    locationId: str
-    locationRevision: PositiveInt64
-    workspaceRevision: PositiveInt64
-    locator: str
-    active: bool
-    revision: UnsignedRevision
-    generation: UnsignedRevision
-    updatedAtMs: UnixTimestampMs
-    replayed: bool
-
-
-class WorkspaceScopeQueryResponseDict(TypedDict, total=True, closed=True):
-    """Complete scope query response dictionary with normalized absence."""
-
-    workspaceId: str
-    scope: RegisteredWorkspaceScopeDict | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

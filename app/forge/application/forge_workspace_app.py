@@ -11,27 +11,29 @@ from app.forge.application.forge_command_utils import (
     session_actor_dto,
     workspace_scope_dto,
 )
-from app.forge.application.forge_workspace_dto import (
+from app.forge.application.inner_dto.forge_envelope_dto import ForgeCommandOutcomeDto
+from app.forge.application.inner_dto.forge_workspace_dto import (
     ForgeActivityListCommandDto,
     ForgeActivityListPayload,
-    ForgeActivityListResultDict,
     ForgeActivityListResultDto,
     ForgeDagCurrentFoundResultDto,
     ForgeDagCurrentMissingResultDto,
-    ForgeDagCurrentResultDict,
     ForgeDagReadCurrentCommandDto,
     ForgeDagSettleCommandDto,
-    ForgeDagSettleResultDict,
     ForgeDagSettleResultDto,
     ForgeLocationListCommandDto,
-    ForgeLocationListResultDict,
     ForgeLocationListResultDto,
     ForgeWorkspaceListCommandDto,
     ForgeWorkspaceListPayload,
-    ForgeWorkspaceListResultDict,
     ForgeWorkspaceListResultDto,
 )
-from app.forge.application.inner_dto.forge_envelope_dto import ForgeCommandOutcomeDto
+from app.forge.application.inner_dto.types.forge_workspace_types import (
+    ForgeActivityListResultDict,
+    ForgeDagCurrentResultDict,
+    ForgeDagSettleResultDict,
+    ForgeLocationListResultDict,
+    ForgeWorkspaceListResultDict,
+)
 from app.forge.schema.activity.forge_activity_schema import (
     ForgeActivityListRequest,
     ForgeActivityListResult,

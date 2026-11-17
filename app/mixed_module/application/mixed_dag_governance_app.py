@@ -7,9 +7,11 @@ from fastapi import status
 from pydantic import TypeAdapter, ValidationError
 
 from app.forge.application.forge_workspace_app import ForgeWorkspaceApplication
-from app.forge.application.forge_workspace_dto import ForgeDagCurrentResultDict
 from app.forge.application.inner_dto.forge_envelope_dto import (
     ForgeCommandSuccessEnvelopeDto,
+)
+from app.forge.application.inner_dto.types.forge_workspace_types import (
+    ForgeDagCurrentResultDict,
 )
 from app.forge.schema.dag.forge_dag_schema import (
     ForgeDagReadCurrentRequest,
@@ -40,7 +42,7 @@ from app.mixed_module.schema.mixed_dag_governance_schema import (
 from app.orchestration.application.autonomy_settlement_app import (
     AutonomySettlementApplication,
 )
-from app.orchestration.application.inner_dto.autonomy_settlement_inner_dto import (
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_settlement_types import (
     DagSettlementGovernanceResponseDict,
 )
 from app.orchestration.schema.autonomy.orchestration_autonomy_settlement_schema import (

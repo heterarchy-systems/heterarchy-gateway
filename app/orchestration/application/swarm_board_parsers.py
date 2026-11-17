@@ -8,20 +8,24 @@ from pydantic import JsonValue
 
 from app.orchestration.application.autonomy_wire_utils import require_wire_object
 from app.orchestration.application.inner_dto.swarm_board_inner_dto import (
-    ConvergeSwarmResponseDict,
     ConvergeSwarmResponseDto,
-    PostSwarmMessageResponseDict,
     PostSwarmMessageResponseDto,
-    SwarmBoardPageResponseDict,
     SwarmBoardPageResponseDto,
-    SwarmStallCheckResponseDict,
     SwarmStallCheckResponseDto,
 )
 from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
     SwarmBoardMessageDto,
     SwarmMemberDto,
-    SwarmRunDict,
     SwarmRunDto,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_board_types import (
+    ConvergeSwarmResponseDict,
+    PostSwarmMessageResponseDict,
+    SwarmBoardPageResponseDict,
+    SwarmStallCheckResponseDict,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_state_types import (
+    SwarmRunDict,
     SwarmVerdictDict,
     SwarmVerificationPanelDict,
 )

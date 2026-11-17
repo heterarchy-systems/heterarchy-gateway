@@ -11,36 +11,38 @@ from app.forge.application.forge_command_utils import (
     session_actor_dto,
     workspace_scope_dto,
 )
-from app.forge.application.forge_swarm_dto import (
-    ForgeSwarmCommandPayloadDict,
+from app.forge.application.inner_dto.forge_envelope_dto import (
+    ForgeCommandEnvelopeDto,
+    ForgeCommandOutcomeDto,
+)
+from app.forge.application.inner_dto.forge_swarm_dto import (
     ForgeSwarmConvergeCommandDto,
-    ForgeSwarmConvergenceResponseDict,
     ForgeSwarmMaterializeHybridCommandDto,
     ForgeSwarmMemberCaptureCommandDto,
     ForgeSwarmMemberOutputInnerDto,
-    ForgeSwarmMemberOutputResponseDict,
     ForgeSwarmPurgeCommandDto,
     ForgeSwarmPurgeInnerDto,
-    ForgeSwarmPurgeResponseDict,
     ForgeSwarmSettleCommandDto,
     ForgeSwarmSettleInnerDto,
     ForgeSwarmSettlementGetCommandDto,
     ForgeSwarmSettlementGetInnerDto,
-    ForgeSwarmSettlementGetResponseDict,
     ForgeSwarmSettlementReceiptInnerDto,
-    ForgeSwarmSettlementReceiptResponseDict,
-    ForgeSwarmSettleResponseDict,
     ForgeSwarmWorkspaceGetCommandDto,
     ForgeSwarmWorkspaceGetInnerDto,
-    ForgeSwarmWorkspaceGetResponseDict,
     ForgeSwarmWorkspaceProvisionCommandDto,
     ForgeSwarmWorkspaceReceiptInnerDto,
-    ForgeSwarmWorkspaceReceiptResponseDict,
     converge_inner_dto,
 )
-from app.forge.application.inner_dto.forge_envelope_dto import (
-    ForgeCommandEnvelopeDto,
-    ForgeCommandOutcomeDto,
+from app.forge.application.inner_dto.types.forge_swarm_types import (
+    ForgeSwarmCommandPayloadDict,
+    ForgeSwarmConvergenceResponseDict,
+    ForgeSwarmMemberOutputResponseDict,
+    ForgeSwarmPurgeResponseDict,
+    ForgeSwarmSettlementGetResponseDict,
+    ForgeSwarmSettlementReceiptResponseDict,
+    ForgeSwarmSettleResponseDict,
+    ForgeSwarmWorkspaceGetResponseDict,
+    ForgeSwarmWorkspaceReceiptResponseDict,
 )
 from app.forge.schema.envelope.forge_envelope_schema import ForgeCommandRequest
 from app.forge.schema.swarm.capture.forge_swarm_capture_schema import (

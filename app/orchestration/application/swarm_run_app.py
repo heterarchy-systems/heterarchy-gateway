@@ -15,24 +15,28 @@ from app.orchestration.application.inner_dto.swarm_run_inner_dto import (
     CreateSwarmChannelCommandDto,
     CreateSwarmRunCommandDto,
     CreateSwarmRunInnerDto,
-    CreateSwarmRunResponseDict,
     KillSwarmMemberCommandDto,
     KillSwarmMemberInnerDto,
-    KillSwarmMemberResponseDict,
     SubscribeSwarmChannelCommandDto,
     SubscribeSwarmChannelInnerDto,
-    SubscribeSwarmChannelResponseDict,
     SwarmRunInspectionInnerDto,
-    SwarmRunInspectionResponseDict,
     SwarmRunListInnerDto,
-    SwarmRunListResponseDict,
 )
 from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
-    SwarmChannelDict,
     SwarmChannelDto,
-    SwarmMemberDict,
     SwarmMemberDto,
     SwarmRunDto,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_run_types import (
+    CreateSwarmRunResponseDict,
+    KillSwarmMemberResponseDict,
+    SubscribeSwarmChannelResponseDict,
+    SwarmRunInspectionResponseDict,
+    SwarmRunListResponseDict,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_state_types import (
+    SwarmChannelDict,
+    SwarmMemberDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     ORCHESTRATION_SWARM_EXCHANGE_POLICY,

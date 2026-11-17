@@ -3,8 +3,10 @@
 from fastapi import status
 
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
-    OrchestrationBackendErrorDict,
     OrchestrationBackendErrorDto,
+)
+from app.orchestration.application.inner_dto.types.orchestration_outcome_types import (
+    OrchestrationBackendErrorDict,
 )
 from app.orchestration.exceptions.orchestration_exceptions import (
     ORCHESTRATION_ERROR_RESPONSES,

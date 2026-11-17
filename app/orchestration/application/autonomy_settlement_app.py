@@ -8,14 +8,16 @@ from pydantic import JsonValue
 
 from app.orchestration.application.inner_dto.autonomy_settlement_inner_dto import (
     DagSettlementAuthorityCommandDto,
-    DagSettlementAuthorityResponseDict,
     DagSettlementAuthorityResponseDto,
-    DagSettlementGovernanceResponseDict,
     DagSettlementGovernanceResponseDto,
     DagSettlementParticipantDto,
 )
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
+)
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_settlement_types import (
+    DagSettlementAuthorityResponseDict,
+    DagSettlementGovernanceResponseDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,

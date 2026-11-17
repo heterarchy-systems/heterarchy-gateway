@@ -8,15 +8,17 @@ from pydantic import JsonValue
 
 from app.orchestration.application.autonomy_wire_utils import require_wire_object
 from app.orchestration.application.inner_dto.autonomy_scope_inner_dto import (
-    RegisteredWorkspaceScopeDict,
     RegisteredWorkspaceScopeDto,
     WorkspaceQueryScopeDto,
     WorkspaceScopeQueryDto,
-    WorkspaceScopeQueryResponseDict,
     WorkspaceScopeRegisterCommandDto,
 )
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
+)
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_scope_types import (
+    RegisteredWorkspaceScopeDict,
+    WorkspaceScopeQueryResponseDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,

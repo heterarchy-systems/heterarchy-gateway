@@ -15,8 +15,10 @@ from starlette.types import Scope
 from typing_extensions import TypedDict
 
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
-    OrchestrationBackendErrorDict,
     OrchestrationOutcomeDto,
+)
+from app.orchestration.application.inner_dto.types.orchestration_outcome_types import (
+    OrchestrationBackendErrorDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,

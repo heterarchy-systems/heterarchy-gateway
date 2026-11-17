@@ -8,13 +8,13 @@ from fastapi import status
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
 )
-from app.orchestration.application.inner_dto.swarm_board_inner_dto import (
+from app.orchestration.application.inner_dto.types.swarm.swarm_board_types import (
     ConvergeSwarmResponseDict,
     PostSwarmMessageResponseDict,
     SwarmBoardPageResponseDict,
     SwarmStallCheckResponseDict,
 )
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
+from app.orchestration.application.inner_dto.types.swarm.swarm_state_types import (
     SwarmRunDict,
     SwarmVerdictDict,
     SwarmVerificationPanelDict,

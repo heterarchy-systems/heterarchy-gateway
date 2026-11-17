@@ -16,14 +16,16 @@ from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
 )
 from app.orchestration.application.inner_dto.profile_inner_dto import (
     CreateProfileCommandDto,
-    ProfileCreateOutcomeDict,
     ProfileCreateOutcomeDto,
-    ProfileDict,
     ProfileDto,
     ProfileLifecycleCommandDto,
-    ProfileMutationDict,
     ProfileMutationDto,
     UpdateProfileConfigCommandDto,
+)
+from app.orchestration.application.inner_dto.types.profile_types import (
+    ProfileCreateOutcomeDict,
+    ProfileDict,
+    ProfileMutationDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,

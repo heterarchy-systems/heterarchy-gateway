@@ -2,15 +2,11 @@
 
 from dataclasses import dataclass
 
-from typing_extensions import TypedDict
-
+from app.orchestration.application.inner_dto.types.orchestration_outcome_types import (
+    OrchestrationBackendErrorDict,
+    OrchestrationOutcomeDict,
+)
 from app.shared.ingredient_element.gateway.upstream_reply_enums import UpstreamReplyKind
-
-
-class OrchestrationBackendErrorDict(TypedDict, total=True, closed=True):
-    code: str
-    message: str
-    retryable: bool
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -33,12 +29,6 @@ class OrchestrationBackendErrorDto:
             retryable=self.retryable,
         )
         return result
-
-
-class OrchestrationOutcomeDict[ResultDictT](TypedDict, total=True, closed=True):
-    status_code: int
-    body_kind: UpstreamReplyKind
-    response: ResultDictT | OrchestrationBackendErrorDict
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -3,15 +3,18 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from typing_extensions import TypedDict
-
 from app.orchestration.application.inner_dto.orchestration_execution_dto import (
-    ExecutionPermissionsDict,
     ExecutionPermissionsDto,
-    ExecutionTimeoutsDict,
     ExecutionTimeoutsDto,
-    McpGrantDict,
     McpGrantDto,
+)
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_snapshot_types import (
+    ExecutionSnapshotOutcomeResponseDict,
+    ExecutionSnapshotQueryResponseDict,
+    LaunchLedgerRecordDict,
+    LaunchLedgerStateDict,
+    PrepareExecutionSnapshotRequestDict,
+    ProcessOwnershipDict,
 )
 from app.orchestration.schema.types.autonomy_types import (
     DagRevision,
@@ -27,87 +30,6 @@ from app.shared.ingredient_element.orchestration.autonomy_enums import (
     LaunchUnknownReasonEnum,
 )
 from app.shared.ingredient_element.orchestration.profile_enums import CliEngineEnum
-
-
-class ProcessOwnershipDict(TypedDict, total=True, closed=True):
-    """Operating-system process-group ownership witness dictionary."""
-
-    pid: UInt32
-    pgid: UInt32
-    startTime: str
-    bootId: str
-
-
-class LaunchLedgerStateDict(TypedDict, total=True, closed=True):
-    """Launch-ledger state dictionary with explicit nullable observations."""
-
-    status: LaunchLedgerStatusEnum
-    ownership: ProcessOwnershipDict | None
-    exitCode: SignedInt32 | None
-    unknownReason: LaunchUnknownReasonEnum | None
-    observedAtMs: UnixTimestampMs | None
-
-
-class LaunchLedgerRecordDict(TypedDict, total=True, closed=True):
-    """Complete durable execution launch-ledger record dictionary."""
-
-    snapshotId: str
-    workspaceId: str
-    goalId: str
-    dagRevision: DagRevision
-    nodeId: str
-    assignmentId: str
-    attempt: WorkAttempt
-    state: LaunchLedgerStateDict
-    revision: UnsignedRevision
-    updatedAtMs: UnixTimestampMs
-
-
-class PrepareExecutionSnapshotRequestDict(TypedDict, total=True, closed=True):
-    """Complete secret-free execution snapshot prepare request dictionary."""
-
-    requestId: str
-    snapshotId: str
-    goalId: str
-    dagRevision: DagRevision
-    nodeId: str
-    assignmentId: str
-    attempt: WorkAttempt
-    activityId: str
-    profileId: str
-    profileRevision: PositiveInt64
-    resolvedEngine: CliEngineEnum
-    resolvedModel: str
-    resolvedReasoning: str | None
-    rolePromptDigestHex: str | None
-    worktreePath: str
-    leaseId: str
-    leaseRevision: UInt64
-    leaseExpiresAtMs: UnixTimestampMs
-    mcpGrant: McpGrantDict | None
-    permissions: ExecutionPermissionsDict
-    timeouts: ExecutionTimeoutsDict
-
-
-class ExecutionSnapshotOutcomeResponseDict(TypedDict, total=True, closed=True):
-    """Committed or rejected execution snapshot outcome dictionary."""
-
-    committed: bool
-    rejectionCode: str | None
-    detail: str | None
-    record: LaunchLedgerRecordDict | None
-
-
-class ExecutionSnapshotQueryResponseDict(TypedDict, total=True, closed=True):
-    """Exact execution attempt query response with normalized record absence."""
-
-    workspaceId: str
-    goalId: str
-    dagRevision: DagRevision
-    nodeId: str
-    assignmentId: str
-    attempt: WorkAttempt
-    record: LaunchLedgerRecordDict | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

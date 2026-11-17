@@ -7,9 +7,11 @@ from fastapi import status
 from pydantic import TypeAdapter, ValidationError
 
 from app.forge.application.forge_swarm_app import ForgeSwarmApplication
-from app.forge.application.forge_swarm_dto import ForgeSwarmSettlementGetResponseDict
 from app.forge.application.inner_dto.forge_envelope_dto import (
     ForgeCommandSuccessEnvelopeDto,
+)
+from app.forge.application.inner_dto.types.forge_swarm_types import (
+    ForgeSwarmSettlementGetResponseDict,
 )
 from app.forge.schema.envelope.forge_envelope_schema import (
     ForgeLocator,
@@ -36,7 +38,7 @@ from app.mixed_module.application.mixed_application_utils import (
     require_orchestration_success,
 )
 from app.mixed_module.exceptions.mixed_exceptions import MixedDependencyFailureError
-from app.orchestration.application.inner_dto.swarm_run_inner_dto import (
+from app.orchestration.application.inner_dto.types.swarm.swarm_run_types import (
     SwarmRunInspectionResponseDict,
 )
 from app.orchestration.application.swarm_run_app import SwarmRunApplication

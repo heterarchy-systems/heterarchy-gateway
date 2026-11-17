@@ -148,7 +148,7 @@ app/forge/
   routers/      workspace/, dag/, swarm/
 ```
 
-`swarm/` 스키마는 실제 계약 책임에 따라 identity·workspace·capture·convergence·settlement로 묶습니다. 카탈로그와 private HARNESS의 contract 경로도 해당 기능 모듈을 직접 참조합니다.
+`swarm/` 스키마는 실제 계약 책임에 따라 identity·workspace·capture·convergence·settlement로 묶습니다. 카탈로그와 private HARNESS의 contract 경로도 해당 기능 모듈을 직접 참조합니다. 내부 dataclass는 `application/inner_dto/`, 그 직렬화 계약인 TypedDict와 wire union은 `application/inner_dto/types/`가 소유합니다. wire 타입이 많은 Orchestration 기능은 `types/autonomy/`와 `types/swarm/`으로 묶습니다.
 
 FastAPI 상태별 응답 metadata는 공통 `ResponseModelDefinition`·`ResponseContentDefinition`과 closed TypedDict를 사용해 선언합니다. Forge·Orchestration의 공통 오류 집합과 Mixed의 각 view별 집합을 라우터에서 재사용합니다. 실제 HTTP 본문은 기존 Pydantic 응답 모델로 검증합니다. 프로젝트 함수·Application 호출은 keyword 인자로 매개변수의 의미를 명시합니다.
 

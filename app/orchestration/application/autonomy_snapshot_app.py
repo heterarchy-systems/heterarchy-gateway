@@ -9,9 +9,7 @@ from pydantic import JsonValue, TypeAdapter
 from app.orchestration.application.autonomy_wire_utils import require_wire_object
 from app.orchestration.application.inner_dto.autonomy_snapshot_inner_dto import (
     ExecutionSnapshotOutcomeDto,
-    ExecutionSnapshotOutcomeResponseDict,
     ExecutionSnapshotQueryDto,
-    ExecutionSnapshotQueryResponseDict,
     LaunchLedgerRecordDto,
     LaunchLedgerStateDto,
     PrepareExecutionSnapshotCommandDto,
@@ -23,6 +21,10 @@ from app.orchestration.application.inner_dto.orchestration_execution_dto import 
 )
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
+)
+from app.orchestration.application.inner_dto.types.autonomy.autonomy_snapshot_types import (
+    ExecutionSnapshotOutcomeResponseDict,
+    ExecutionSnapshotQueryResponseDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,

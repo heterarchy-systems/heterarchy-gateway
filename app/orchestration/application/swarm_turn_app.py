@@ -20,7 +20,6 @@ from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
 )
 from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
-    SwarmMemberDict,
     SwarmMemberDto,
 )
 from app.orchestration.application.inner_dto.swarm_turn_inner_dto import (
@@ -31,13 +30,18 @@ from app.orchestration.application.inner_dto.swarm_turn_inner_dto import (
     DispatchedTurnSupervisionDto,
     DispatchSwarmTurnCommandDto,
     DispatchSwarmTurnInnerDto,
-    DispatchSwarmTurnResponseDict,
     FailSwarmTurnCommandDto,
     SwarmModelSwitchInnerDto,
-    SwarmModelSwitchResponseDict,
-    SwarmWakeupBatchDict,
     SwarmWakeupBatchDto,
     SwitchSwarmMemberModelCommandDto,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_state_types import (
+    SwarmMemberDict,
+)
+from app.orchestration.application.inner_dto.types.swarm.swarm_turn_types import (
+    DispatchSwarmTurnResponseDict,
+    SwarmModelSwitchResponseDict,
+    SwarmWakeupBatchDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     ORCHESTRATION_SWARM_EXCHANGE_POLICY,

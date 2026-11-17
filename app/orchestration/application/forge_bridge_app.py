@@ -8,15 +8,17 @@ from pydantic import JsonValue, TypeAdapter
 
 from app.orchestration.application.autonomy_wire_utils import require_wire_object
 from app.orchestration.application.inner_dto.forge_bridge_inner_dto import (
-    ForgeConvergeSwarmResponseDict,
     ForgeConvergeSwarmResponseDto,
-    ForgeSettleSwarmResponseDict,
     ForgeSettleSwarmResponseDto,
-    SyncAutonomyOutboxResponseDict,
     SyncAutonomyOutboxResponseDto,
 )
 from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
     OrchestrationOutcomeDto,
+)
+from app.orchestration.application.inner_dto.types.forge_bridge_types import (
+    ForgeConvergeSwarmResponseDict,
+    ForgeSettleSwarmResponseDict,
+    SyncAutonomyOutboxResponseDict,
 )
 from app.orchestration.application.orchestration_command_utils import (
     ORCHESTRATION_SWARM_EXCHANGE_POLICY,
