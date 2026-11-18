@@ -1,28 +1,18 @@
-"""Application operations for the Native Swarm run lane."""
+"""Wire parsers and identity validators for the Native Swarm run lane."""
 
-from functools import partial
 from uuid import UUID
 
 from fastapi import status
 from pydantic import JsonValue
 
-from app.orchestration.application.autonomy_wire_utils import require_wire_object
-from app.orchestration.application.inner_dto.orchestration_outcome_dto import (
-    OrchestrationOutcomeDto,
-)
-from app.orchestration.application.inner_dto.swarm_run_inner_dto import (
-    AddSwarmMemberCommandDto,
-    CreateSwarmChannelCommandDto,
-    CreateSwarmRunCommandDto,
+from app.orchestration.application.inner_dto.swarm.swarm_run_inner_dto import (
     CreateSwarmRunInnerDto,
-    KillSwarmMemberCommandDto,
     KillSwarmMemberInnerDto,
-    SubscribeSwarmChannelCommandDto,
     SubscribeSwarmChannelInnerDto,
     SwarmRunInspectionInnerDto,
     SwarmRunListInnerDto,
 )
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_state_inner_dto import (
     SwarmChannelDto,
     SwarmMemberDto,
     SwarmRunDto,
@@ -38,284 +28,72 @@ from app.orchestration.application.inner_dto.types.swarm.swarm_state_types impor
     SwarmChannelDict,
     SwarmMemberDict,
 )
-from app.orchestration.application.orchestration_command_utils import (
-    ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-    execute_orchestration_operation,
+from app.orchestration.application.orchestration_wire_parsers import (
+    parse_wire_array,
+    require_wire_object,
+    wire_optional,
 )
-from app.orchestration.application.swarm_state_parsers import (
+from app.orchestration.application.swarm.swarm_state_parsers import (
     parse_swarm_channel,
     parse_swarm_channel_subscription,
     parse_swarm_doorbell,
     parse_swarm_member,
     parse_swarm_run,
+)
+from app.orchestration.application.swarm.swarm_verification_parsers import (
     parse_swarm_verdict,
     parse_swarm_verification_panel,
 )
 from app.orchestration.schema.swarm.orchestration_swarm_run_schema import (
-    MAX_SWARM_RUN_LIST_SIZE,
-    AddSwarmMemberRequest,
-    CreateSwarmChannelRequest,
     CreateSwarmRunRequest,
-    KillSwarmMemberRequest,
-    SubscribeSwarmChannelRequest,
     SubscribeSwarmChannelResponse,
     SwarmChannelScopeIdentity,
     SwarmMemberScopeIdentity,
-    SwarmRunListFilter,
     SwarmRunScopeIdentity,
     SwarmSubscriptionPathIdentity,
 )
-from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
 from app.shared.exception import OrchestrationExcept
-from app.shared.types.base_types import JsonObject
 from app.shared.types.threaded_mapping import threaded_map
 
 
-class SwarmRunApplication:
-    """Forward Native Swarm run operations without taking domain authority."""
+def validate_create_scope(workspace_id: UUID, request: CreateSwarmRunRequest) -> None:
+    """Match the source client's Workspace-scope request preflight.
 
-    def __init__(self, calling: OrchestrationCalling) -> None:
-        """Bind one request-scoped Orchestration caller.
-
-        Args:
-            calling: Request-scoped authenticated Orchestration caller.
-        Return:
-            None.
-        """
-        self._calling = calling
-
-    async def create_swarm_run(
-        self,
-        workspace_id: UUID,
-        request: CreateSwarmRunRequest,
-    ) -> OrchestrationOutcomeDto[CreateSwarmRunResponseDict]:
-        """Create or replay one Swarm run through Orchestration.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            request: Strict public run command.
-        Return:
-            Source status and typed run creation result.
-        """
-        _validate_create_scope(workspace_id=workspace_id, request=request)
-        command: CreateSwarmRunCommandDto = request.to_inner_dto()
-        path = f"/v1/workspaces/{workspace_id}/swarms"
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="POST",
-            path=path,
-            parse_result=partial(_parse_create_swarm_run, expected_workspace_id=workspace_id),
-            body=command.to_dict(),
-            result_statuses=(status.HTTP_200_OK, status.HTTP_201_CREATED),
-            validate_result_status=_validate_create_swarm_run_status,
+    Args:
+        workspace_id: Workspace selected by the Gateway path.
+        request: Strict public Swarm run command.
+    Return:
+        None.
+    """
+    scope = request.scope
+    if scope is not None and (scope.workspace_id != workspace_id or scope.location_id.int == 0):
+        raise OrchestrationExcept(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="orchestration_invalid_request",
+            message="Swarm scope does not match the Workspace path or has a nil Location identity",
+            retryable=False,
             workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
         )
-        return result
-
-    async def fetch_swarm_runs(
-        self,
-        workspace_id: UUID,
-        filters: SwarmRunListFilter,
-    ) -> OrchestrationOutcomeDto[SwarmRunListResponseDict]:
-        """Read bounded Swarm runs for one Workspace.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            filters: Optional bounded source query filter.
-        Return:
-            Source status and typed Swarm run list.
-        """
-        path = f"/v1/workspaces/{workspace_id}/swarms"
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="GET",
-            path=path,
-            parse_result=partial(
-                _parse_swarm_run_list,
-                expected_workspace_id=workspace_id,
-                max_result_count=(
-                    filters.limit if filters.limit is not None else MAX_SWARM_RUN_LIST_SIZE
-                ),
-            ),
-            params=filters.to_query_params(),
-            workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-        )
-        return result
-
-    async def inspect_swarm_run(
-        self,
-        workspace_id: UUID,
-        swarm_run_id: UUID,
-    ) -> OrchestrationOutcomeDto[SwarmRunInspectionResponseDict]:
-        """Read one full Swarm run inspection snapshot.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            swarm_run_id: Swarm run selected by the Gateway path.
-        Return:
-            Source status and typed full inspection snapshot.
-        """
-        path = f"/v1/workspaces/{workspace_id}/swarms/{swarm_run_id}"
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="GET",
-            path=path,
-            parse_result=partial(
-                _parse_swarm_run_inspection,
-                expected_workspace_id=workspace_id,
-                expected_swarm_run_id=swarm_run_id,
-            ),
-            workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-        )
-        return result
-
-    async def create_swarm_channel(
-        self,
-        workspace_id: UUID,
-        swarm_run_id: UUID,
-        request: CreateSwarmChannelRequest,
-    ) -> OrchestrationOutcomeDto[SwarmChannelDict]:
-        """Create one channel in the selected Swarm run.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            swarm_run_id: Swarm run selected by the Gateway path.
-            request: Strict public channel command.
-        Return:
-            Source status and typed channel result.
-        """
-        command: CreateSwarmChannelCommandDto = request.to_inner_dto()
-        path = f"/v1/workspaces/{workspace_id}/swarms/{swarm_run_id}/channels"
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="POST",
-            path=path,
-            parse_result=partial(
-                _parse_created_channel,
-                expected_workspace_id=workspace_id,
-                expected_swarm_run_id=swarm_run_id,
-                expected_channel_id=request.channel_id,
-            ),
-            body=command.to_dict(),
-            result_statuses=(status.HTTP_201_CREATED,),
-            workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-        )
-        return result
-
-    async def subscribe_swarm_channel(
-        self,
-        workspace_id: UUID,
-        swarm_run_id: UUID,
-        channel_id: UUID,
-        request: SubscribeSwarmChannelRequest,
-    ) -> OrchestrationOutcomeDto[SubscribeSwarmChannelResponseDict]:
-        """Subscribe one run member to the selected channel.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            swarm_run_id: Swarm run selected by the Gateway path.
-            channel_id: Channel selected by the Gateway path.
-            request: Strict public subscription command.
-        Return:
-            Source status and typed subscription result.
-        """
-        command: SubscribeSwarmChannelCommandDto = request.to_inner_dto()
-        path = (
-            f"/v1/workspaces/{workspace_id}/swarms/{swarm_run_id}/channels/"
-            f"{channel_id}/subscriptions"
-        )
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="POST",
-            path=path,
-            parse_result=partial(
-                _parse_subscribe_swarm_channel,
-                expected_workspace_id=workspace_id,
-                expected_swarm_run_id=swarm_run_id,
-                expected_channel_id=channel_id,
-                expected_member_id=request.member_id,
-            ),
-            body=command.to_dict(),
-            workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-        )
-        return result
-
-    async def add_swarm_member(
-        self,
-        workspace_id: UUID,
-        swarm_run_id: UUID,
-        request: AddSwarmMemberRequest,
-    ) -> OrchestrationOutcomeDto[SwarmMemberDict]:
-        """Add one member to the selected Swarm run.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            swarm_run_id: Swarm run selected by the Gateway path.
-            request: Strict public member command.
-        Return:
-            Source status and typed member result.
-        """
-        command: AddSwarmMemberCommandDto = request.to_inner_dto()
-        path = f"/v1/workspaces/{workspace_id}/swarms/{swarm_run_id}/members"
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="POST",
-            path=path,
-            parse_result=partial(
-                _parse_added_member,
-                expected_workspace_id=workspace_id,
-                expected_swarm_run_id=swarm_run_id,
-                expected_member_id=request.member_id,
-            ),
-            body=command.to_dict(),
-            result_statuses=(status.HTTP_201_CREATED,),
-            workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-        )
-        return result
-
-    async def kill_swarm_member(
-        self,
-        workspace_id: UUID,
-        swarm_run_id: UUID,
-        member_id: UUID,
-        request: KillSwarmMemberRequest,
-    ) -> OrchestrationOutcomeDto[KillSwarmMemberResponseDict]:
-        """Kill one member and return source-reported cascade members.
-
-        Args:
-            workspace_id: Workspace selected by the Gateway path.
-            swarm_run_id: Swarm run selected by the Gateway path.
-            member_id: Member selected by the Gateway path.
-            request: Required empty public request body.
-        Return:
-            Source status and typed killed member result.
-        """
-        command: KillSwarmMemberCommandDto = request.to_inner_dto()
-        path = f"/v1/workspaces/{workspace_id}/swarms/{swarm_run_id}/members/{member_id}/kill"
-        result = await execute_orchestration_operation(
-            calling=self._calling,
-            method="POST",
-            path=path,
-            parse_result=partial(
-                _parse_killed_members,
-                expected_workspace_id=workspace_id,
-                expected_swarm_run_id=swarm_run_id,
-                expected_member_id=member_id,
-            ),
-            body=command.to_dict(),
-            workspace_id=workspace_id,
-            exchange_policy=ORCHESTRATION_SWARM_EXCHANGE_POLICY,
-        )
-        return result
 
 
-def _parse_create_swarm_run(
+def validate_create_swarm_run_status(
+    status_code: int,
+    result: CreateSwarmRunResponseDict,
+) -> None:
+    """Keep new-run and exact-replay source statuses paired with replay state.
+
+    Args:
+        status_code: Original Orchestration HTTP status.
+        result: Parsed create or replay result.
+    Return:
+        None.
+    """
+    expected_status = status.HTTP_200_OK if result["run"]["replayed"] else status.HTTP_201_CREATED
+    if status_code != expected_status:
+        raise ValueError("Swarm run replay marker does not match source HTTP status")
+
+
+def parse_create_swarm_run(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -343,44 +121,7 @@ def _parse_create_swarm_run(
     return result
 
 
-def _validate_create_scope(workspace_id: UUID, request: CreateSwarmRunRequest) -> None:
-    """Match the source client's Workspace-scope request preflight.
-
-    Args:
-        workspace_id: Workspace selected by the Gateway path.
-        request: Strict public Swarm run command.
-    Return:
-        None.
-    """
-    scope = request.scope
-    if scope is not None and (scope.workspace_id != workspace_id or scope.location_id.int == 0):
-        raise OrchestrationExcept(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="orchestration_invalid_request",
-            message="Swarm scope does not match the Workspace path or has a nil Location identity",
-            retryable=False,
-            workspace_id=workspace_id,
-        )
-
-
-def _validate_create_swarm_run_status(
-    status_code: int,
-    result: CreateSwarmRunResponseDict,
-) -> None:
-    """Keep new-run and exact-replay source statuses paired with replay state.
-
-    Args:
-        status_code: Original Orchestration HTTP status.
-        result: Parsed create or replay result.
-    Return:
-        None.
-    """
-    expected_status = status.HTTP_200_OK if result["run"]["replayed"] else status.HTTP_201_CREATED
-    if status_code != expected_status:
-        raise ValueError("Swarm run replay marker does not match source HTTP status")
-
-
-def _parse_swarm_run_list(
+def parse_swarm_run_list(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -396,7 +137,7 @@ def _parse_swarm_run_list(
         Typed Swarm run list result.
     """
     payload = require_wire_object(payload=value, required_keys=("runs",), optional_keys=())
-    raw_runs = _required_array(payload=payload, key="runs")
+    raw_runs = parse_wire_array(value=payload["runs"], label="runs")
     if len(raw_runs) > max_result_count:
         raise ValueError("Swarm run list exceeded the requested result limit")
     runs = tuple(threaded_map(function=parse_swarm_run, values=raw_runs))
@@ -406,7 +147,7 @@ def _parse_swarm_run_list(
     return result
 
 
-def _parse_swarm_run_inspection(
+def parse_swarm_run_inspection(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -436,31 +177,35 @@ def _parse_swarm_run_inspection(
     run = parse_swarm_run(value=payload["run"])
     channels = tuple(
         threaded_map(
-            function=parse_swarm_channel, values=_required_array(payload=payload, key="channels")
+            function=parse_swarm_channel,
+            values=parse_wire_array(value=payload["channels"], label="channels"),
         )
     )
     members = tuple(
         threaded_map(
-            function=parse_swarm_member, values=_required_array(payload=payload, key="members")
+            function=parse_swarm_member,
+            values=parse_wire_array(value=payload["members"], label="members"),
         )
     )
     subscriptions = tuple(
         threaded_map(
             function=parse_swarm_channel_subscription,
-            values=_required_array(payload=payload, key="subscriptions"),
+            values=parse_wire_array(value=payload["subscriptions"], label="subscriptions"),
         )
     )
     doorbells = tuple(
         threaded_map(
             function=parse_swarm_doorbell,
-            values=_required_array(payload=payload, key="pendingDoorbells"),
+            values=parse_wire_array(value=payload["pendingDoorbells"], label="pendingDoorbells"),
         )
     )
-    panel_value = payload.get("verificationPanel")
-    panel = parse_swarm_verification_panel(value=panel_value) if panel_value is not None else None
+    panel = wire_optional(
+        value=payload.get("verificationPanel"), parser=parse_swarm_verification_panel
+    )
     verdicts = tuple(
         threaded_map(
-            function=parse_swarm_verdict, values=_required_array(payload=payload, key="verdicts")
+            function=parse_swarm_verdict,
+            values=parse_wire_array(value=payload["verdicts"], label="verdicts"),
         )
     )
     _require_run_path_identity(
@@ -506,7 +251,7 @@ def _parse_swarm_run_inspection(
     return result
 
 
-def _parse_created_channel(
+def parse_created_channel(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -534,7 +279,7 @@ def _parse_created_channel(
     return result
 
 
-def _parse_subscribe_swarm_channel(
+def parse_subscribe_swarm_channel(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -575,7 +320,7 @@ def _parse_subscribe_swarm_channel(
     return result
 
 
-def _parse_added_member(
+def parse_added_member(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -603,7 +348,7 @@ def _parse_added_member(
     return result
 
 
-def _parse_killed_members(
+def parse_killed_members(
     value: JsonValue,
     *,
     expected_workspace_id: UUID,
@@ -624,7 +369,7 @@ def _parse_killed_members(
     members = tuple(
         threaded_map(
             function=parse_swarm_member,
-            values=_required_array(payload=payload, key="killedMembers"),
+            values=parse_wire_array(value=payload["killedMembers"], label="killedMembers"),
         )
     )
     for member in members:
@@ -636,22 +381,6 @@ def _parse_killed_members(
     if not any(member.member_id == expected_member_id for member in members):
         raise ValueError("Swarm kill response omitted the requested member")
     result = KillSwarmMemberInnerDto(killed_members=members).to_dict()
-    return result
-
-
-def _required_array(payload: JsonObject, key: str) -> list[JsonValue]:
-    """Extract one required source JSON array.
-
-    Args:
-        payload: Validated source JSON object.
-        key: Required array field name.
-    Return:
-        Ordered JSON items for typed element parsing.
-    """
-    value = payload[key]
-    if not isinstance(value, list):
-        raise ValueError(f"Orchestration field {key} must be an array")
-    result: list[JsonValue] = value
     return result
 
 

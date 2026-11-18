@@ -1,5 +1,7 @@
 """Swarm wire aliases with exact source enum input spellings."""
 
+from collections.abc import Mapping
+from enum import StrEnum
 from functools import partial
 from typing import Annotated
 from uuid import UUID
@@ -106,155 +108,81 @@ def parse_non_zero_digest_hex(value: str | JsonValue) -> str:
 type NonZeroDigestHex = Annotated[str, BeforeValidator(parse_non_zero_digest_hex)]
 
 
-def parse_swarm_run_mode_input(value: SwarmRunModeEnum | JsonValue) -> SwarmRunModeEnum:
-    """Parse the exact RunMode spellings accepted by the source API.
+def _parse_aliased_enum[EnumT: StrEnum](
+    aliases: Mapping[str, EnumT],
+    label: str,
+    value: EnumT | JsonValue,
+) -> EnumT:
+    """Parse exact source enum spellings using an explicit closed alias table.
 
     Args:
+        aliases: Closed spelling-to-enum lookup owned by this Swarm field.
+        label: Human-readable field label for validation errors.
         value: Source JSON string or already validated enum.
     Return:
-        Canonical Swarm run mode enum.
+        Canonical Swarm enum member.
     """
-    if value in ("standalone", "STANDALONE"):
-        result = SwarmRunModeEnum.STANDALONE
-    elif value in ("dag_node_hybrid", "dagNodeHybrid", "DAG_NODE_HYBRID"):
-        result = SwarmRunModeEnum.DAG_NODE_HYBRID
-    else:
-        raise ValueError("Swarm run mode spelling is not accepted by the source")
-    return result
-
-
-def parse_swarm_role_kind_input(value: SwarmRoleKindEnum | JsonValue) -> SwarmRoleKindEnum:
-    """Parse the exact lowercase or uppercase source role spellings.
-
-    Args:
-        value: Source JSON string or already validated enum.
-    Return:
-        Canonical Swarm role enum.
-    """
-    aliases = {
-        "coordinator": SwarmRoleKindEnum.COORDINATOR,
-        "COORDINATOR": SwarmRoleKindEnum.COORDINATOR,
-        "worker": SwarmRoleKindEnum.WORKER,
-        "WORKER": SwarmRoleKindEnum.WORKER,
-        "helper": SwarmRoleKindEnum.HELPER,
-        "HELPER": SwarmRoleKindEnum.HELPER,
-        "verifier": SwarmRoleKindEnum.VERIFIER,
-        "VERIFIER": SwarmRoleKindEnum.VERIFIER,
-        "monitor": SwarmRoleKindEnum.MONITOR,
-        "MONITOR": SwarmRoleKindEnum.MONITOR,
-    }
     if not isinstance(value, str):
-        raise ValueError("Swarm role kind requires a source string")
+        raise ValueError(f"{label} requires a source string")
     result = aliases.get(value)
     if result is None:
-        raise ValueError("Swarm role kind spelling is not accepted by the source")
+        raise ValueError(f"{label} spelling is not accepted by the source")
     return result
 
 
-def parse_swarm_workspace_mode_input(
-    value: SwarmWorkspaceModeEnum | JsonValue,
-) -> SwarmWorkspaceModeEnum:
-    """Parse the exact lowercase or uppercase source workspace modes.
-
-    Args:
-        value: Source JSON string or already validated enum.
-    Return:
-        Canonical Swarm workspace mode enum.
-    """
-    aliases = {
-        "inherit": SwarmWorkspaceModeEnum.INHERIT,
-        "INHERIT": SwarmWorkspaceModeEnum.INHERIT,
-        "share": SwarmWorkspaceModeEnum.SHARE,
-        "SHARE": SwarmWorkspaceModeEnum.SHARE,
-        "branch": SwarmWorkspaceModeEnum.BRANCH,
-        "BRANCH": SwarmWorkspaceModeEnum.BRANCH,
-    }
-    if not isinstance(value, str):
-        raise ValueError("Swarm workspace mode requires a source string")
-    result = aliases.get(value)
-    if result is None:
-        raise ValueError("Swarm workspace mode spelling is not accepted by the source")
-    return result
-
-
-def parse_swarm_turn_failure_disposition_input(
-    value: SwarmTurnFailureDispositionEnum | JsonValue,
-) -> SwarmTurnFailureDispositionEnum:
-    """Parse the exact source turn failure disposition spellings.
-
-    Args:
-        value: Source JSON string or already validated enum.
-    Return:
-        Canonical Swarm turn failure disposition enum.
-    """
-    aliases = {
-        "transient_retry": SwarmTurnFailureDispositionEnum.TRANSIENT_RETRY,
-        "transientRetry": SwarmTurnFailureDispositionEnum.TRANSIENT_RETRY,
-        "TRANSIENT_RETRY": SwarmTurnFailureDispositionEnum.TRANSIENT_RETRY,
-        "quota_exceeded": SwarmTurnFailureDispositionEnum.QUOTA_EXCEEDED,
-        "quotaExceeded": SwarmTurnFailureDispositionEnum.QUOTA_EXCEEDED,
-        "QUOTA_EXCEEDED": SwarmTurnFailureDispositionEnum.QUOTA_EXCEEDED,
-        "stopped": SwarmTurnFailureDispositionEnum.STOPPED,
-        "STOPPED": SwarmTurnFailureDispositionEnum.STOPPED,
-    }
-    if not isinstance(value, str):
-        raise ValueError("Swarm turn failure disposition requires a source string")
-    result = aliases.get(value)
-    if result is None:
-        raise ValueError("Swarm turn failure spelling is not accepted by the source")
-    return result
-
-
-def parse_swarm_convergence_target_input(
-    value: SwarmConvergenceTargetEnum | JsonValue,
-) -> SwarmConvergenceTargetEnum:
-    """Parse the exact source convergence target spellings.
-
-    Args:
-        value: Source JSON string or already validated enum.
-    Return:
-        Canonical Swarm convergence target enum.
-    """
-    aliases = {
-        "candidate_ready": SwarmConvergenceTargetEnum.CANDIDATE_READY,
-        "candidateReady": SwarmConvergenceTargetEnum.CANDIDATE_READY,
-        "CANDIDATE_READY": SwarmConvergenceTargetEnum.CANDIDATE_READY,
-        "settled": SwarmConvergenceTargetEnum.SETTLED,
-        "SETTLED": SwarmConvergenceTargetEnum.SETTLED,
-    }
-    if not isinstance(value, str):
-        raise ValueError("Swarm convergence target requires a source string")
-    result = aliases.get(value)
-    if result is None:
-        raise ValueError("Swarm convergence target spelling is not accepted by the source")
-    return result
-
-
-def parse_swarm_verdict_outcome_input(
-    value: SwarmVerdictOutcomeEnum | JsonValue,
-) -> SwarmVerdictOutcomeEnum:
-    """Parse the exact lowercase or canonical source verdict spellings.
-
-    Args:
-        value: Source JSON string or already validated enum.
-    Return:
-        Canonical Swarm verdict outcome enum.
-    """
-    aliases = {
-        "accepted": SwarmVerdictOutcomeEnum.ACCEPTED,
-        "ACCEPTED": SwarmVerdictOutcomeEnum.ACCEPTED,
-        "rejected": SwarmVerdictOutcomeEnum.REJECTED,
-        "REJECTED": SwarmVerdictOutcomeEnum.REJECTED,
-        "needs_changes": SwarmVerdictOutcomeEnum.NEEDS_CHANGES,
-        "needsChanges": SwarmVerdictOutcomeEnum.NEEDS_CHANGES,
-        "NEEDS_CHANGES": SwarmVerdictOutcomeEnum.NEEDS_CHANGES,
-    }
-    if not isinstance(value, str):
-        raise ValueError("Swarm verdict outcome requires a source string")
-    result = aliases.get(value)
-    if result is None:
-        raise ValueError("Swarm verdict outcome spelling is not accepted by the source")
-    return result
+_RUN_MODE_ALIASES: dict[str, SwarmRunModeEnum] = {
+    "standalone": SwarmRunModeEnum.STANDALONE,
+    "STANDALONE": SwarmRunModeEnum.STANDALONE,
+    "dag_node_hybrid": SwarmRunModeEnum.DAG_NODE_HYBRID,
+    "dagNodeHybrid": SwarmRunModeEnum.DAG_NODE_HYBRID,
+    "DAG_NODE_HYBRID": SwarmRunModeEnum.DAG_NODE_HYBRID,
+}
+_ROLE_KIND_ALIASES: dict[str, SwarmRoleKindEnum] = {
+    "coordinator": SwarmRoleKindEnum.COORDINATOR,
+    "COORDINATOR": SwarmRoleKindEnum.COORDINATOR,
+    "worker": SwarmRoleKindEnum.WORKER,
+    "WORKER": SwarmRoleKindEnum.WORKER,
+    "helper": SwarmRoleKindEnum.HELPER,
+    "HELPER": SwarmRoleKindEnum.HELPER,
+    "verifier": SwarmRoleKindEnum.VERIFIER,
+    "VERIFIER": SwarmRoleKindEnum.VERIFIER,
+    "monitor": SwarmRoleKindEnum.MONITOR,
+    "MONITOR": SwarmRoleKindEnum.MONITOR,
+}
+_WORKSPACE_MODE_ALIASES: dict[str, SwarmWorkspaceModeEnum] = {
+    "inherit": SwarmWorkspaceModeEnum.INHERIT,
+    "INHERIT": SwarmWorkspaceModeEnum.INHERIT,
+    "share": SwarmWorkspaceModeEnum.SHARE,
+    "SHARE": SwarmWorkspaceModeEnum.SHARE,
+    "branch": SwarmWorkspaceModeEnum.BRANCH,
+    "BRANCH": SwarmWorkspaceModeEnum.BRANCH,
+}
+_FAILURE_DISPOSITION_ALIASES: dict[str, SwarmTurnFailureDispositionEnum] = {
+    "transient_retry": SwarmTurnFailureDispositionEnum.TRANSIENT_RETRY,
+    "transientRetry": SwarmTurnFailureDispositionEnum.TRANSIENT_RETRY,
+    "TRANSIENT_RETRY": SwarmTurnFailureDispositionEnum.TRANSIENT_RETRY,
+    "quota_exceeded": SwarmTurnFailureDispositionEnum.QUOTA_EXCEEDED,
+    "quotaExceeded": SwarmTurnFailureDispositionEnum.QUOTA_EXCEEDED,
+    "QUOTA_EXCEEDED": SwarmTurnFailureDispositionEnum.QUOTA_EXCEEDED,
+    "stopped": SwarmTurnFailureDispositionEnum.STOPPED,
+    "STOPPED": SwarmTurnFailureDispositionEnum.STOPPED,
+}
+_CONVERGENCE_TARGET_ALIASES: dict[str, SwarmConvergenceTargetEnum] = {
+    "candidate_ready": SwarmConvergenceTargetEnum.CANDIDATE_READY,
+    "candidateReady": SwarmConvergenceTargetEnum.CANDIDATE_READY,
+    "CANDIDATE_READY": SwarmConvergenceTargetEnum.CANDIDATE_READY,
+    "settled": SwarmConvergenceTargetEnum.SETTLED,
+    "SETTLED": SwarmConvergenceTargetEnum.SETTLED,
+}
+_VERDICT_OUTCOME_ALIASES: dict[str, SwarmVerdictOutcomeEnum] = {
+    "accepted": SwarmVerdictOutcomeEnum.ACCEPTED,
+    "ACCEPTED": SwarmVerdictOutcomeEnum.ACCEPTED,
+    "rejected": SwarmVerdictOutcomeEnum.REJECTED,
+    "REJECTED": SwarmVerdictOutcomeEnum.REJECTED,
+    "needs_changes": SwarmVerdictOutcomeEnum.NEEDS_CHANGES,
+    "needsChanges": SwarmVerdictOutcomeEnum.NEEDS_CHANGES,
+    "NEEDS_CHANGES": SwarmVerdictOutcomeEnum.NEEDS_CHANGES,
+}
 
 
 def parse_canonical_swarm_uuid(value: UUID | JsonValue) -> UUID:
@@ -298,25 +226,35 @@ type SwarmCommitOid = Annotated[str, BeforeValidator(parse_swarm_commit_oid_inpu
 
 type SwarmRunModeKindInput = Annotated[
     SwarmRunModeEnum,
-    BeforeValidator(parse_swarm_run_mode_input),
+    BeforeValidator(partial(_parse_aliased_enum, _RUN_MODE_ALIASES, "Swarm run mode")),
 ]
 type SwarmRoleKindInput = Annotated[
     SwarmRoleKindEnum,
-    BeforeValidator(parse_swarm_role_kind_input),
+    BeforeValidator(partial(_parse_aliased_enum, _ROLE_KIND_ALIASES, "Swarm role kind")),
 ]
 type SwarmWorkspaceModeInput = Annotated[
     SwarmWorkspaceModeEnum,
-    BeforeValidator(parse_swarm_workspace_mode_input),
+    BeforeValidator(partial(_parse_aliased_enum, _WORKSPACE_MODE_ALIASES, "Swarm workspace mode")),
 ]
 type SwarmVerdictOutcomeInput = Annotated[
     SwarmVerdictOutcomeEnum,
-    BeforeValidator(parse_swarm_verdict_outcome_input),
+    BeforeValidator(
+        partial(_parse_aliased_enum, _VERDICT_OUTCOME_ALIASES, "Swarm verdict outcome")
+    ),
 ]
 type SwarmTurnFailureDispositionInput = Annotated[
     SwarmTurnFailureDispositionEnum,
-    BeforeValidator(parse_swarm_turn_failure_disposition_input),
+    BeforeValidator(
+        partial(
+            _parse_aliased_enum,
+            _FAILURE_DISPOSITION_ALIASES,
+            "Swarm turn failure disposition",
+        )
+    ),
 ]
 type SwarmConvergenceTargetInput = Annotated[
     SwarmConvergenceTargetEnum,
-    BeforeValidator(parse_swarm_convergence_target_input),
+    BeforeValidator(
+        partial(_parse_aliased_enum, _CONVERGENCE_TARGET_ALIASES, "Swarm convergence target")
+    ),
 ]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_state_inner_dto import (
     SwarmBoardMessageDto,
     SwarmConvergenceGateDto,
     SwarmMemberDto,

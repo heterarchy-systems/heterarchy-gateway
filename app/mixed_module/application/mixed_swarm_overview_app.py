@@ -41,7 +41,7 @@ from app.mixed_module.exceptions.mixed_exceptions import MixedDependencyFailureE
 from app.orchestration.application.inner_dto.types.swarm.swarm_run_types import (
     SwarmRunInspectionResponseDict,
 )
-from app.orchestration.application.swarm_run_app import SwarmRunApplication
+from app.orchestration.application.swarm.swarm_run_app import SwarmRunApplication
 from app.orchestration.schema.swarm.orchestration_swarm_run_schema import SwarmRunInspectionResponse
 from app.shared.api_calling_box.forge_calling import ForgeCalling
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling

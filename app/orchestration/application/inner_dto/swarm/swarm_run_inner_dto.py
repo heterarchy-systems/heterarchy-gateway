@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.orchestration.application.inner_dto.autonomy_scope_inner_dto import (
+from app.orchestration.application.inner_dto.autonomy.autonomy_scope_inner_dto import (
     WorkspaceQueryScopeDto,
 )
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_state_inner_dto import (
     SwarmChannelDto,
     SwarmChannelSubscriptionDto,
     SwarmDoorbellDto,

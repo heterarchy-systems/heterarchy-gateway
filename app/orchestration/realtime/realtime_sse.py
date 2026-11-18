@@ -25,6 +25,7 @@ from app.orchestration.exceptions.realtime_exceptions import (
 )
 from app.orchestration.realtime.realtime_frame_parser import (
     RealtimeSseFrameParser,
+    encode_sse_frame,
     parse_event_cursor,
 )
 from app.orchestration.schema.types.realtime_types import (
@@ -48,83 +49,11 @@ from app.shared.ingredient_element.orchestration.realtime_enums import (
     RealtimeQueueEventCapacityEnum,
     RealtimeSendTimeoutMsEnum,
     RealtimeSourceChunkByteLimitEnum,
-    RealtimeSseEventNameEnum,
     RealtimeSseFrameKindEnum,
 )
-from app.shared.types.json_contract import decode_json, encode_json, validate_json_object
+from app.shared.types.json_contract import decode_json
 
 REALTIME_SEND_TIMEOUT_MS = RealtimeSendTimeoutMsEnum.TIMEOUT_MS
-
-
-def _check_wire_frame_size(frame: bytes) -> bytes:
-    """Reject an encoded SSE frame outside its configured byte budget.
-
-    Args:
-        frame: Complete UTF-8 SSE frame.
-    Return:
-        The original bounded frame bytes.
-    """
-    if len(frame) > RealtimeFrameByteLimitEnum.MAX_BYTES:
-        raise ValueError("Encoded realtime SSE frame exceeded its byte limit")
-    result = frame
-    return result
-
-
-def _encode_event_frame(frame: RealtimeSseFrameDto) -> bytes:
-    """Encode one state-change event and its source resume cursor.
-
-    Args:
-        frame: Validated source event frame.
-    Return:
-        Complete SSE event bytes.
-    """
-    if (
-        frame.event is None
-        or frame.event_name is not RealtimeSseEventNameEnum.STATE_CHANGED
-        or frame.cursor is None
-    ):
-        raise ValueError("Realtime event frame is incomplete")
-    data = encode_json(value=validate_json_object(value=frame.event.to_dict()))
-    result = b"event: " + frame.event_name.value.encode("ascii")
-    result += b"\nid: " + frame.cursor.encode("ascii")
-    result += b"\ndata: " + data + b"\n\n"
-    return _check_wire_frame_size(frame=result)
-
-
-def _encode_resync_frame(frame: RealtimeSseFrameDto) -> bytes:
-    """Encode the source's terminal resync event and retry guidance.
-
-    Args:
-        frame: Validated source resync frame.
-    Return:
-        Complete terminal SSE event bytes.
-    """
-    if (
-        frame.resync is None
-        or frame.event_name is not RealtimeSseEventNameEnum.RESYNC_REQUIRED
-        or frame.retry_ms is None
-    ):
-        raise ValueError("Realtime resync frame is incomplete")
-    data = encode_json(value=validate_json_object(value=frame.resync.to_dict()))
-    result = b"event: " + frame.event_name.value.encode("ascii")
-    result += b"\nretry: " + str(frame.retry_ms).encode("ascii")
-    result += b"\ndata: " + data + b"\n\n"
-    return _check_wire_frame_size(frame=result)
-
-
-def _encode_comment_frame(frame: RealtimeSseFrameDto) -> bytes:
-    """Encode one source comment or keepalive frame.
-
-    Args:
-        frame: Validated source comment frame.
-    Return:
-        Complete SSE comment bytes.
-    """
-    if frame.comment is None:
-        raise ValueError("Realtime comment frame is incomplete")
-    lines = frame.comment.split("\n")
-    result = "".join(f":{line}\n" for line in lines).encode("utf-8") + b"\n"
-    return _check_wire_frame_size(frame=result)
 
 
 async def _cancel_and_join_task(task: asyncio.Task[None] | None) -> None:
@@ -248,26 +177,6 @@ class RealtimeStreamRelay:
         self._closed = False
 
     @staticmethod
-    def _encode_frame(frame: RealtimeSseFrameDto) -> bytes:
-        """Encode one validated source frame in SSE wire form.
-
-        Args:
-            frame: Validated source event, resync, or keepalive.
-        Return:
-            Bounded UTF-8 SSE frame bytes.
-        """
-        match frame.kind:
-            case RealtimeSseFrameKindEnum.EVENT:
-                result = _encode_event_frame(frame=frame)
-            case RealtimeSseFrameKindEnum.RESYNC:
-                result = _encode_resync_frame(frame=frame)
-            case RealtimeSseFrameKindEnum.COMMENT:
-                result = _encode_comment_frame(frame=frame)
-            case RealtimeSseFrameKindEnum.END:
-                result = b""
-        return result
-
-    @staticmethod
     def _end_frame() -> RealtimeQueuedFrameDto:
         """Create the internal end marker for a completed source pump.
 
@@ -300,7 +209,7 @@ class RealtimeStreamRelay:
             cursor=frame.cursor,
             sequence=frame.sequence,
             last_delivered_sequence=source_watermark,
-            payload=self._encode_frame(frame=frame),
+            payload=encode_sse_frame(frame=frame),
         )
         return result
 

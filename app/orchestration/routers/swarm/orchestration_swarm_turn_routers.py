@@ -3,7 +3,7 @@
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Response, status
 
-from app.orchestration.application.swarm_turn_app import SwarmTurnApplication
+from app.orchestration.application.swarm.swarm_turn_app import SwarmTurnApplication
 from app.orchestration.exceptions.orchestration_exceptions import (
     ORCHESTRATION_ERROR_RESPONSES,
     OrchestrationBackendErrorResponse,

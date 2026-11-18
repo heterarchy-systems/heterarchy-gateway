@@ -1,23 +1,18 @@
 """Normalize Native Swarm board replies and enforce source client fences."""
 
-from collections.abc import Mapping
+from functools import partial
 from uuid import UUID
 
 from fastapi import status
 from pydantic import JsonValue
 
-from app.orchestration.application.autonomy_wire_utils import require_wire_object
-from app.orchestration.application.inner_dto.swarm_board_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_board_inner_dto import (
     ConvergeSwarmResponseDto,
     PostSwarmMessageResponseDto,
     SwarmBoardPageResponseDto,
     SwarmStallCheckResponseDto,
 )
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
-    SwarmBoardMessageDto,
-    SwarmMemberDto,
-    SwarmRunDto,
-)
+from app.orchestration.application.inner_dto.swarm.swarm_state_inner_dto import SwarmRunDto
 from app.orchestration.application.inner_dto.types.swarm.swarm_board_types import (
     ConvergeSwarmResponseDict,
     PostSwarmMessageResponseDict,
@@ -29,11 +24,25 @@ from app.orchestration.application.inner_dto.types.swarm.swarm_state_types impor
     SwarmVerdictDict,
     SwarmVerificationPanelDict,
 )
-from app.orchestration.application.swarm_state_parsers import (
+from app.orchestration.application.orchestration_wire_parsers import (
+    UINT32_MAX,
+    UINT64_MAX,
+    parse_wire_array,
+    parse_wire_bool,
+    parse_wire_int,
+    parse_wire_object_items,
+    parse_wire_str,
+    parse_wire_uuid_tuple,
+    require_wire_object,
+    wire_optional,
+)
+from app.orchestration.application.swarm.swarm_state_parsers import (
     parse_swarm_board_message,
-    parse_swarm_convergence_gate,
     parse_swarm_member,
     parse_swarm_run,
+)
+from app.orchestration.application.swarm.swarm_verification_parsers import (
+    parse_swarm_convergence_gate,
     parse_swarm_verdict,
     parse_swarm_verification_panel,
 )
@@ -67,144 +76,6 @@ _STALL_OPTIONAL_KEYS = (
     "emittedMessage",
 )
 _MAX_SWARM_BOARD_PAGE_SIZE = 128
-
-
-def _required_boolean(payload: Mapping[str, JsonValue], key: str) -> bool:
-    """Read one source boolean without accepting numeric aliases.
-
-    Args:
-        payload: Exact response object.
-        key: Required response property.
-    Return:
-        Exact source boolean value.
-    """
-    value = payload[key]
-    if type(value) is not bool:
-        raise ValueError(f"Swarm field {key} must be a boolean")
-    result = value
-    return result
-
-
-def _required_string(payload: Mapping[str, JsonValue], key: str) -> str:
-    """Read one required source string without coercion.
-
-    Args:
-        payload: Exact response object.
-        key: Required response property.
-    Return:
-        Exact source string.
-    """
-    value = payload[key]
-    if not isinstance(value, str):
-        raise ValueError(f"Swarm field {key} must be a string")
-    result = value
-    return result
-
-
-def _optional_string(payload: Mapping[str, JsonValue], key: str) -> str | None:
-    """Read one optional string source field as required nullable data.
-
-    Args:
-        payload: Response object allowing the source skip key.
-        key: Optional response property.
-    Return:
-        Source string or None when omitted or null.
-    """
-    value = payload.get(key)
-    if value is None:
-        result = None
-    elif isinstance(value, str):
-        result = value
-    else:
-        raise ValueError(f"Swarm field {key} must be a string or null")
-    return result
-
-
-def _optional_integer(payload: Mapping[str, JsonValue], key: str) -> int | None:
-    """Read one optional integer without accepting booleans.
-
-    Args:
-        payload: Response object allowing the source skip key.
-        key: Optional response property.
-    Return:
-        Source integer or None when omitted or null.
-    """
-    value = payload.get(key)
-    if value is None:
-        result = None
-    elif type(value) is int:
-        result = value
-    else:
-        raise ValueError(f"Swarm field {key} must be an integer or null")
-    return result
-
-
-def _optional_uuid(payload: Mapping[str, JsonValue], key: str) -> UUID | None:
-    """Read one optional UUID source field as required nullable data.
-
-    Args:
-        payload: Response object allowing the source skip key.
-        key: Optional response property.
-    Return:
-        Parsed source UUID or None when omitted or null.
-    """
-    value = payload.get(key)
-    if value is None:
-        result = None
-    else:
-        result = parse_wire_uuid(value=value)
-    return result
-
-
-def _required_uuid_tuple(payload: Mapping[str, JsonValue], key: str) -> tuple[UUID, ...]:
-    """Parse a required source array of UUID strings.
-
-    Args:
-        payload: Exact response object.
-        key: Required response property.
-    Return:
-        Immutable parsed UUID sequence.
-    """
-    value = payload[key]
-    if not isinstance(value, list):
-        raise ValueError(f"Swarm field {key} must be an array")
-    result = tuple(parse_wire_uuid(value=item) for item in value)
-    return result
-
-
-def _required_message_tuple(
-    payload: Mapping[str, JsonValue],
-    key: str,
-) -> tuple[SwarmBoardMessageDto, ...]:
-    """Parse a required list of canonical source board messages.
-
-    Args:
-        payload: Exact response object.
-        key: Required response property.
-    Return:
-        Immutable parsed board messages.
-    """
-    value = payload[key]
-    if not isinstance(value, list):
-        raise ValueError(f"Swarm field {key} must be an array")
-    result = tuple(threaded_map(function=parse_swarm_board_message, values=value))
-    return result
-
-
-def _default_member_tuple(payload: Mapping[str, JsonValue], key: str) -> tuple[SwarmMemberDto, ...]:
-    """Apply the source deserializer's empty-array default for stopped members.
-
-    Args:
-        payload: Stall response allowing an omitted default field.
-        key: Source stopped-members property.
-    Return:
-        Immutable source members or an empty sequence when omitted.
-    """
-    value = payload.get(key, [])
-    if not isinstance(value, list):
-        raise ValueError(f"Swarm field {key} must be an array")
-    result = tuple(parse_swarm_member(value=item) for item in value)
-    return result
 
 
 def _require_valid_run(run: SwarmRunDto, workspace_id: UUID, swarm_run_id: UUID) -> None:
@@ -320,11 +191,14 @@ def parse_post_message_result(
         raise ValueError("Swarm message response author mismatch")
     result = PostSwarmMessageResponseDto(
         message=message,
-        woken_member_ids=_required_uuid_tuple(payload=payload, key="wokenMemberIds"),
-        coalesced_doorbell_member_ids=_required_uuid_tuple(
-            payload=payload, key="coalescedDoorbellMemberIds"
+        woken_member_ids=parse_wire_uuid_tuple(
+            value=payload["wokenMemberIds"], label="wokenMemberIds"
         ),
-        replayed=_required_boolean(payload=payload, key="replayed"),
+        coalesced_doorbell_member_ids=parse_wire_uuid_tuple(
+            value=payload["coalescedDoorbellMemberIds"],
+            label="coalescedDoorbellMemberIds",
+        ),
+        replayed=parse_wire_bool(value=payload["replayed"], label="replayed"),
     ).to_dict()
     return result
 
@@ -351,12 +225,16 @@ def parse_board_page_result(
         required_keys=_BOARD_PAGE_REQUIRED_KEYS,
         optional_keys=_BOARD_PAGE_OPTIONAL_KEYS,
     )
-    messages = _required_message_tuple(payload=payload, key="messages")
-    next_sequence = _optional_integer(payload=payload, key="nextAfterSequence")
+    message_items = parse_wire_array(value=payload["messages"], label="messages")
+    messages = tuple(threaded_map(function=parse_swarm_board_message, values=message_items))
+    next_sequence = wire_optional(
+        value=payload.get("nextAfterSequence"),
+        parser=partial(parse_wire_int, minimum=0, maximum=UINT64_MAX, label="nextAfterSequence"),
+    )
     page = SwarmBoardPageResponseDto(
         messages=messages,
         next_after_sequence=next_sequence,
-        has_more=_required_boolean(payload=payload, key="hasMore"),
+        has_more=parse_wire_bool(value=payload["hasMore"], label="hasMore"),
     )
     _validate_board_page(
         page=page,
@@ -489,11 +367,10 @@ def parse_convergence_result(
     _require_valid_run(
         run=run, workspace_id=expected_workspace_id, swarm_run_id=expected_swarm_run_id
     )
-    gate_value = payload.get("gate")
-    gate = parse_swarm_convergence_gate(value=gate_value) if gate_value is not None else None
+    gate = wire_optional(value=payload.get("gate"), parser=parse_swarm_convergence_gate)
     result = ConvergeSwarmResponseDto(
         run=run,
-        settled=_required_boolean(payload=payload, key="settled"),
+        settled=parse_wire_bool(value=payload["settled"], label="settled"),
         gate=gate,
     ).to_dict()
     return result
@@ -565,35 +442,59 @@ def parse_stall_check_result(
     payload = require_wire_object(
         payload=value, required_keys=_STALL_REQUIRED_KEYS, optional_keys=_STALL_OPTIONAL_KEYS
     )
-    action = _required_string(payload=payload, key="action")
+    action = parse_wire_str(value=payload["action"], label="action")
     if not action:
         raise ValueError("Swarm stall response action must not be empty")
-    run_value = payload.get("run")
-    run = parse_swarm_run(value=run_value) if run_value is not None else None
+    run = wire_optional(value=payload.get("run"), parser=parse_swarm_run)
     if run is not None:
         _require_valid_run(
             run=run, workspace_id=expected_workspace_id, swarm_run_id=expected_swarm_run_id
         )
-    stopped_members = _default_member_tuple(payload=payload, key="stoppedMembers")
-    message_value = payload.get("emittedMessage")
-    emitted_message = (
-        parse_swarm_board_message(value=message_value) if message_value is not None else None
+    stopped_members = parse_wire_object_items(
+        value=payload.get("stoppedMembers", []),
+        parser=parse_swarm_member,
+        label="stoppedMembers",
     )
-    run_state_value = payload.get("runState")
-    run_state = (
-        parse_wire_enum(enum_type=SwarmRunStateEnum, value=run_state_value)
-        if run_state_value is not None
-        else None
+    emitted_message = wire_optional(
+        value=payload.get("emittedMessage"), parser=parse_swarm_board_message
+    )
+    run_state = wire_optional(
+        value=payload.get("runState"), parser=partial(parse_wire_enum, SwarmRunStateEnum)
     )
     result = SwarmStallCheckResponseDto(
         action=action,
         run_state=run_state,
-        working_members=_optional_integer(payload=payload, key="workingMembers"),
-        target_member_id=_optional_uuid(payload=payload, key="targetMemberId"),
-        bottleneck_reason=_optional_string(payload=payload, key="bottleneckReason"),
-        livelock_reason=_optional_string(payload=payload, key="livelockReason"),
-        observed_ping_pong_streak=_optional_integer(payload=payload, key="observedPingPongStreak"),
-        observed_member_turns=_optional_integer(payload=payload, key="observedMemberTurns"),
+        working_members=wire_optional(
+            value=payload.get("workingMembers"),
+            parser=partial(parse_wire_int, minimum=0, maximum=UINT64_MAX, label="workingMembers"),
+        ),
+        target_member_id=wire_optional(value=payload.get("targetMemberId"), parser=parse_wire_uuid),
+        bottleneck_reason=wire_optional(
+            value=payload.get("bottleneckReason"),
+            parser=partial(parse_wire_str, label="bottleneckReason"),
+        ),
+        livelock_reason=wire_optional(
+            value=payload.get("livelockReason"),
+            parser=partial(parse_wire_str, label="livelockReason"),
+        ),
+        observed_ping_pong_streak=wire_optional(
+            value=payload.get("observedPingPongStreak"),
+            parser=partial(
+                parse_wire_int,
+                minimum=0,
+                maximum=UINT32_MAX,
+                label="observedPingPongStreak",
+            ),
+        ),
+        observed_member_turns=wire_optional(
+            value=payload.get("observedMemberTurns"),
+            parser=partial(
+                parse_wire_int,
+                minimum=0,
+                maximum=UINT64_MAX,
+                label="observedMemberTurns",
+            ),
+        ),
         run=run,
         stopped_members=stopped_members,
         emitted_message=emitted_message,

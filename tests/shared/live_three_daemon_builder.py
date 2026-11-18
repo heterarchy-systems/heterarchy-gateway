@@ -143,7 +143,7 @@ class LiveThreeDaemonBuilder:
             Gateway origin and the source fixture identities.
         """
         await _assert_source_checkout(_FORGE_ROOT, None)
-        await _assert_source_checkout(_ORCHESTRATION_ROOT, "56d1d8d")
+        await _assert_source_checkout(_ORCHESTRATION_ROOT, "4643381")
         _require_loopback_port(_GATEWAY_PORT)
         forge_port = _reserve_loopback_port()
         orchestration_port = _reserve_loopback_port()

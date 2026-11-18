@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import status
 from pydantic import JsonValue
 
-from app.orchestration.application.inner_dto.autonomy_settlement_inner_dto import (
+from app.orchestration.application.inner_dto.autonomy.autonomy_settlement_inner_dto import (
     DagSettlementAuthorityCommandDto,
     DagSettlementAuthorityResponseDto,
     DagSettlementGovernanceResponseDto,

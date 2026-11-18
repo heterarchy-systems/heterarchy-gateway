@@ -4,9 +4,8 @@ from functools import partial
 from uuid import UUID
 
 from fastapi import status
-from pydantic import JsonValue, TypeAdapter
+from pydantic import JsonValue
 
-from app.orchestration.application.autonomy_wire_utils import require_wire_object
 from app.orchestration.application.inner_dto.forge_bridge_inner_dto import (
     ForgeConvergeSwarmResponseDto,
     ForgeSettleSwarmResponseDto,
@@ -24,9 +23,17 @@ from app.orchestration.application.orchestration_command_utils import (
     ORCHESTRATION_SWARM_EXCHANGE_POLICY,
     execute_orchestration_operation,
 )
-from app.orchestration.application.swarm_state_parsers import (
+from app.orchestration.application.orchestration_wire_parsers import (
+    UINT64_MAX,
+    parse_wire_bool,
+    parse_wire_int,
+    parse_wire_str_tuple,
+    require_wire_object,
+    wire_optional,
+)
+from app.orchestration.application.swarm.swarm_state_parsers import parse_swarm_run
+from app.orchestration.application.swarm.swarm_verification_parsers import (
     parse_swarm_convergence_gate,
-    parse_swarm_run,
 )
 from app.orchestration.schema.forge_bridge.orchestration_forge_bridge_schema import (
     ForgeConvergeSwarmRequest,
@@ -35,60 +42,34 @@ from app.orchestration.schema.forge_bridge.orchestration_forge_bridge_schema imp
     ForgeSettleSwarmResponse,
     SyncAutonomyOutboxRequest,
 )
-from app.orchestration.schema.types.orchestration_types import Int64, UInt64
+from app.orchestration.schema.types.orchestration_types import UInt64
 from app.shared.api_calling_box.orchestration_calling import OrchestrationCalling
 from app.shared.ingredient_element.orchestration.forge_bridge_enums import (
     ForgeBridgeFieldEnum,
 )
-from app.shared.types.base_types import JsonObject
 from app.shared.types.wire_scalar_types import parse_wire_uuid
 
-_UINT64_ADAPTER: TypeAdapter[UInt64] = TypeAdapter(UInt64)
-_INT64_ADAPTER: TypeAdapter[Int64] = TypeAdapter(Int64)
-_BOOL_ADAPTER: TypeAdapter[bool] = TypeAdapter(bool)
 
-
-def _required_boolean(payload: JsonObject, field: ForgeBridgeFieldEnum) -> bool:
-    """Extract one exact JSON boolean from a bridge response.
+def _parse_uint64_field(value: JsonValue, field: ForgeBridgeFieldEnum) -> UInt64:
+    """Parse one required unsigned 64-bit integer from a bridge response.
 
     Args:
-        payload: Closed source response object already checked for its wire keys.
-        field: Required field key owned by the bridge wire enum.
+        value: Raw JSON field value.
+        field: Bridge wire field identifier used in error context.
     Return:
-        Exact source boolean.
+        Exact validated UInt64 integer.
     """
-    result = _BOOL_ADAPTER.validate_python(payload[field.value], strict=True)
+    result = parse_wire_int(value=value, minimum=0, maximum=UINT64_MAX, label=field.value)
     return result
 
 
-def _required_string_list(payload: JsonObject, field: ForgeBridgeFieldEnum) -> tuple[str, ...]:
-    """Extract a source string array without coercing any member.
-
-    Args:
-        payload: Closed source response object already checked for its wire keys.
-        field: Required field key owned by the bridge wire enum.
-    Return:
-        Immutable tuple preserving the source order.
-    """
-    value = payload[field.value]
-    if not isinstance(value, list):
-        raise ValueError(f"Bridge field {field.value} must be an array")
-    values: list[str] = []
-    for item in value:
-        if not isinstance(item, str):
-            raise ValueError(f"Bridge field {field.value} must contain strings")
-        values.append(item)
-    result = tuple(values)
-    return result
-
-
-def _parse_outbox_sync_response(payload: JsonValue) -> SyncAutonomyOutboxResponseDict:
-    """Parse the exact bounded autonomy outbox summary.
+def _parse_outbox_sync_dto(payload: JsonValue) -> SyncAutonomyOutboxResponseDto:
+    """Parse the exact bounded autonomy outbox summary DTO.
 
     Args:
         payload: Decoded Orchestration response JSON value.
     Return:
-        Closed typed outbox sync response.
+        Closed inner DTO representing the outbox sync summary.
     """
     source = require_wire_object(
         payload=payload,
@@ -101,19 +82,35 @@ def _parse_outbox_sync_response(payload: JsonValue) -> SyncAutonomyOutboxRespons
         optional_keys=(),
     )
     result = SyncAutonomyOutboxResponseDto(
-        applied_count=_UINT64_ADAPTER.validate_python(
-            source[ForgeBridgeFieldEnum.APPLIED_COUNT.value], strict=True
+        applied_count=_parse_uint64_field(
+            value=source[ForgeBridgeFieldEnum.APPLIED_COUNT.value],
+            field=ForgeBridgeFieldEnum.APPLIED_COUNT,
         ),
-        dag_settled_count=_UINT64_ADAPTER.validate_python(
-            source[ForgeBridgeFieldEnum.DAG_SETTLED_COUNT.value], strict=True
+        dag_settled_count=_parse_uint64_field(
+            value=source[ForgeBridgeFieldEnum.DAG_SETTLED_COUNT.value],
+            field=ForgeBridgeFieldEnum.DAG_SETTLED_COUNT,
         ),
-        swarm_settled_count=_UINT64_ADAPTER.validate_python(
-            source[ForgeBridgeFieldEnum.SWARM_SETTLED_COUNT.value], strict=True
+        swarm_settled_count=_parse_uint64_field(
+            value=source[ForgeBridgeFieldEnum.SWARM_SETTLED_COUNT.value],
+            field=ForgeBridgeFieldEnum.SWARM_SETTLED_COUNT,
         ),
-        last_sequence=_UINT64_ADAPTER.validate_python(
-            source[ForgeBridgeFieldEnum.LAST_SEQUENCE.value], strict=True
+        last_sequence=_parse_uint64_field(
+            value=source[ForgeBridgeFieldEnum.LAST_SEQUENCE.value],
+            field=ForgeBridgeFieldEnum.LAST_SEQUENCE,
         ),
-    ).to_dict()
+    )
+    return result
+
+
+def _parse_outbox_sync_response(payload: JsonValue) -> SyncAutonomyOutboxResponseDict:
+    """Parse the exact bounded autonomy outbox summary.
+
+    Args:
+        payload: Decoded Orchestration response JSON value.
+    Return:
+        Closed typed outbox sync response.
+    """
+    result = _parse_outbox_sync_dto(payload=payload).to_dict()
     return result
 
 
@@ -139,14 +136,17 @@ def _parse_converge_response(
     run = parse_swarm_run(value=source[ForgeBridgeFieldEnum.RUN.value])
     if run.workspace_id != expected_workspace_id or run.swarm_run_id != expected_swarm_run_id:
         raise ValueError("Forge convergence response escaped the requested Workspace or Swarm")
-    gate_value = source.get(ForgeBridgeFieldEnum.GATE.value)
-    gate = parse_swarm_convergence_gate(value=gate_value) if gate_value is not None else None
+    gate = wire_optional(
+        value=source.get(ForgeBridgeFieldEnum.GATE.value),
+        parser=parse_swarm_convergence_gate,
+    )
     if gate is not None and gate.swarm_run_id != expected_swarm_run_id:
         raise ValueError("Forge convergence gate escaped the requested Swarm")
     response = ForgeConvergeSwarmResponseDto(
         run=run,
-        changed_files=_required_string_list(
-            payload=source, field=ForgeBridgeFieldEnum.CHANGED_FILES
+        changed_files=parse_wire_str_tuple(
+            value=source[ForgeBridgeFieldEnum.CHANGED_FILES.value],
+            label=ForgeBridgeFieldEnum.CHANGED_FILES.value,
         ),
         gate=gate,
     )
@@ -196,38 +196,38 @@ def _parse_settle_response(
     gate = parse_swarm_convergence_gate(value=source[ForgeBridgeFieldEnum.GATE.value])
     if gate.swarm_run_id != expected_swarm_run_id:
         raise ValueError("Forge settlement gate escaped the requested Swarm")
-    sequence_value = source.get(ForgeBridgeFieldEnum.OUTBOX_SEQUENCE.value)
-    outbox_sequence = (
-        _UINT64_ADAPTER.validate_python(sequence_value, strict=True)
-        if sequence_value is not None
-        else None
+    outbox_sequence = wire_optional(
+        value=source.get(ForgeBridgeFieldEnum.OUTBOX_SEQUENCE.value),
+        parser=partial(
+            parse_wire_int,
+            minimum=0,
+            maximum=UINT64_MAX,
+            label=ForgeBridgeFieldEnum.OUTBOX_SEQUENCE.value,
+        ),
     )
-    outbox_value = source.get(ForgeBridgeFieldEnum.OUTBOX_SYNC.value)
-    outbox_sync = None
-    if outbox_value is not None:
-        outbox_sync_dict = _parse_outbox_sync_response(payload=outbox_value)
-        if outbox_sync_dict[ForgeBridgeFieldEnum.LAST_SEQUENCE.value] < expected_after_sequence:
-            raise ValueError("Settlement outbox cursor regressed behind its requested sequence")
-        outbox_sync = SyncAutonomyOutboxResponseDto(
-            applied_count=outbox_sync_dict[ForgeBridgeFieldEnum.APPLIED_COUNT.value],
-            dag_settled_count=outbox_sync_dict[ForgeBridgeFieldEnum.DAG_SETTLED_COUNT.value],
-            swarm_settled_count=outbox_sync_dict[ForgeBridgeFieldEnum.SWARM_SETTLED_COUNT.value],
-            last_sequence=outbox_sync_dict[ForgeBridgeFieldEnum.LAST_SEQUENCE.value],
-        )
+    outbox_sync = wire_optional(
+        value=source.get(ForgeBridgeFieldEnum.OUTBOX_SYNC.value),
+        parser=_parse_outbox_sync_dto,
+    )
+    if outbox_sync is not None and outbox_sync.last_sequence < expected_after_sequence:
+        raise ValueError("Settlement outbox cursor regressed behind its requested sequence")
     response = ForgeSettleSwarmResponseDto(
         run=run,
         gate=gate,
         settlement_id=settlement_id,
-        settled_file_count=_UINT64_ADAPTER.validate_python(
-            source[ForgeBridgeFieldEnum.SETTLED_FILE_COUNT.value], strict=True
+        settled_file_count=_parse_uint64_field(
+            value=source[ForgeBridgeFieldEnum.SETTLED_FILE_COUNT.value],
+            field=ForgeBridgeFieldEnum.SETTLED_FILE_COUNT,
         ),
-        settled_at_ms=_INT64_ADAPTER.validate_python(
-            source[ForgeBridgeFieldEnum.SETTLED_AT_MS.value], strict=True
+        settled_at_ms=parse_wire_int(
+            value=source[ForgeBridgeFieldEnum.SETTLED_AT_MS.value],
+            label=ForgeBridgeFieldEnum.SETTLED_AT_MS.value,
         ),
         outbox_sequence=outbox_sequence,
         outbox_sync=outbox_sync,
-        purged_ephemeral=_required_boolean(
-            payload=source, field=ForgeBridgeFieldEnum.PURGED_EPHEMERAL
+        purged_ephemeral=parse_wire_bool(
+            value=source[ForgeBridgeFieldEnum.PURGED_EPHEMERAL.value],
+            label=ForgeBridgeFieldEnum.PURGED_EPHEMERAL.value,
         ),
     )
     result = response.to_dict()

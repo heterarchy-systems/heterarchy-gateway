@@ -4,17 +4,17 @@ from typing import Annotated, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from app.orchestration.application.inner_dto.autonomy_scope_inner_dto import (
+from app.orchestration.application.inner_dto.autonomy.autonomy_scope_inner_dto import (
     WorkspaceQueryScopeDto,
 )
-from app.orchestration.application.inner_dto.swarm_run_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_run_inner_dto import (
     AddSwarmMemberCommandDto,
     CreateSwarmChannelCommandDto,
     CreateSwarmRunCommandDto,
     KillSwarmMemberCommandDto,
     SubscribeSwarmChannelCommandDto,
 )
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_state_inner_dto import (
     DagNodeHybridTargetDto,
     SwarmMemberIdentityDto,
     SwarmRunModeDto,

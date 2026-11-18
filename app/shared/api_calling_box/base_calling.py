@@ -45,8 +45,11 @@ class _UnsupportedResponseEncodingError(ValueError):
 
 
 _FAILURE_RESPONSES: dict[tuple[FailureScenario | None, str], tuple[int, bytes]] = {
-    (FailureScenario.FORGE_500, "forge"): (500, b'{"message":"Simulated Forge error"}'),
-    (FailureScenario.INVALID_JSON, "forge"): (200, b"{invalid json"),
+    (FailureScenario.FORGE_500, "forge"): (
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        b'{"message":"Simulated Forge error"}',
+    ),
+    (FailureScenario.INVALID_JSON, "forge"): (status.HTTP_200_OK, b"{invalid json"),
 }
 _FAILURE_EXCEPTIONS: dict[tuple[FailureScenario | None, str], type[httpx.RequestError]] = {
     (FailureScenario.FORGE_TIMEOUT, "forge"): httpx.ReadTimeout,
@@ -151,7 +154,7 @@ class BaseCalling:
                 error="response body exceeded byte limit",
             )
             raise self._build_upstream_exception(
-                status_code=502,
+                status_code=status.HTTP_502_BAD_GATEWAY,
                 code=f"{self._service_name}_response_too_large",
                 message=f"Upstream {self._service_name} response exceeded its size limit",
                 retryable=False,
@@ -162,7 +165,7 @@ class BaseCalling:
                 error="response used unsupported content encoding",
             )
             raise self._build_upstream_exception(
-                status_code=502,
+                status_code=status.HTTP_502_BAD_GATEWAY,
                 code=f"{self._service_name}_unsupported_content_encoding",
                 message=f"Upstream {self._service_name} response used unsupported content encoding",
                 retryable=False,
@@ -170,7 +173,7 @@ class BaseCalling:
         except TimeoutError as error:
             self._record_uncertain_transport_outcome(method=method, error=error)
             raise self._build_upstream_exception(
-                status_code=504,
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 code=f"{self._service_name}_timeout",
                 message=f"Upstream {self._service_name} request timed out",
                 retryable=method.upper() == "GET",
@@ -178,7 +181,7 @@ class BaseCalling:
         except httpx.TimeoutException as error:
             self._record_uncertain_transport_outcome(method=method, error=error)
             raise self._build_upstream_exception(
-                status_code=504,
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 code=f"{self._service_name}_timeout",
                 message=f"Upstream {self._service_name} request timed out",
                 retryable=method.upper() == "GET",
@@ -186,7 +189,7 @@ class BaseCalling:
         except httpx.HTTPError as error:
             self._record_uncertain_transport_outcome(method=method, error=error)
             raise self._build_upstream_exception(
-                status_code=502,
+                status_code=status.HTTP_502_BAD_GATEWAY,
                 code=f"{self._service_name}_transport_error",
                 message=f"Upstream {self._service_name} transport failed",
                 retryable=method.upper() == "GET",
@@ -194,7 +197,7 @@ class BaseCalling:
         except (ValidationError, ValueError) as error:
             self._record_upstream_outcome(outcome=UpstreamOutcome.FAILED, error=str(error))
             raise self._build_upstream_exception(
-                status_code=502,
+                status_code=status.HTTP_502_BAD_GATEWAY,
                 code=f"{self._service_name}_invalid_payload",
                 message=f"Upstream {self._service_name} returned an invalid JSON payload",
                 retryable=False,
@@ -339,7 +342,7 @@ class BaseCalling:
             response = await self._send_request(
                 method=method, path=path, params=params, body=body, policy=policy
             )
-            if response.status_code >= 400:
+            if response.status_code >= status.HTTP_400_BAD_REQUEST:
                 error = response.text
         except _UpstreamRequestTooLargeError:
             error = "Upstream request body exceeded byte limit"

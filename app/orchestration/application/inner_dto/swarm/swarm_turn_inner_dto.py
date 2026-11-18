@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.orchestration.application.inner_dto.autonomy_snapshot_inner_dto import (
+from app.orchestration.application.inner_dto.autonomy.autonomy_snapshot_inner_dto import (
     LaunchLedgerRecordDto,
 )
 from app.orchestration.application.inner_dto.orchestration_execution_dto import (
@@ -12,7 +12,7 @@ from app.orchestration.application.inner_dto.orchestration_execution_dto import 
     ExecutionTimeoutsDto,
     McpGrantDto,
 )
-from app.orchestration.application.inner_dto.swarm_state_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_state_inner_dto import (
     SwarmBoardMessageDto,
     SwarmMemberDto,
 )

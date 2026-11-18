@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import JsonValue
 
-from app.orchestration.application.swarm_turn_app import (
+from app.orchestration.application.swarm.swarm_turn_app import (
     SwarmTurnApplication,
     build_dispatch_exchange_policy,
 )

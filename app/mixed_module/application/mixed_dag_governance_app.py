@@ -39,7 +39,7 @@ from app.mixed_module.exceptions.mixed_exceptions import (
 from app.mixed_module.schema.mixed_dag_governance_schema import (
     MixedDagGovernanceRequest,
 )
-from app.orchestration.application.autonomy_settlement_app import (
+from app.orchestration.application.autonomy.autonomy_settlement_app import (
     AutonomySettlementApplication,
 )
 from app.orchestration.application.inner_dto.types.autonomy.autonomy_settlement_types import (

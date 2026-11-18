@@ -43,7 +43,7 @@ Gateway는 `http://127.0.0.1:7979`에서 실행됩니다.
 make ci
 ```
 
-런타임·Ruff·Pyrefly·가드레일·전체 테스트를 실행합니다. 비공개 하네스 `.agents/python_bff_harness/`, 인접 Forge checkout, Orchestration `56d1d8d` checkout 및 Rust SSD 빌드 환경이 필요합니다.
+런타임·Ruff·Pyrefly·가드레일·전체 테스트를 실행합니다. 비공개 하네스 `.agents/python_bff_harness/`, 인접 Forge checkout, Orchestration `4643381` checkout 및 Rust SSD 빌드 환경이 필요합니다.
 
 실제 3서비스 연동 테스트는 격리된 Forge·Orchestration·Gateway 프로세스와 로컬 worker·broker fixture를 사용합니다.
 

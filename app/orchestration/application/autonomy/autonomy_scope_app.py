@@ -6,8 +6,7 @@ from uuid import UUID
 from fastapi import status
 from pydantic import JsonValue
 
-from app.orchestration.application.autonomy_wire_utils import require_wire_object
-from app.orchestration.application.inner_dto.autonomy_scope_inner_dto import (
+from app.orchestration.application.inner_dto.autonomy.autonomy_scope_inner_dto import (
     RegisteredWorkspaceScopeDto,
     WorkspaceQueryScopeDto,
     WorkspaceScopeQueryDto,
@@ -23,6 +22,7 @@ from app.orchestration.application.inner_dto.types.autonomy.autonomy_scope_types
 from app.orchestration.application.orchestration_command_utils import (
     execute_orchestration_operation,
 )
+from app.orchestration.application.orchestration_wire_parsers import require_wire_object
 from app.orchestration.schema.autonomy.orchestration_autonomy_scope_schema import (
     RegisteredWorkspaceScopeResponse,
     WorkspaceQueryScopeSchema,

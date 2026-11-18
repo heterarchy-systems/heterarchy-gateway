@@ -23,7 +23,7 @@ from app.orchestration.application.orchestration_command_utils import (
     ORCHESTRATION_SWARM_EXCHANGE_POLICY,
     execute_orchestration_operation,
 )
-from app.orchestration.application.swarm_board_parsers import (
+from app.orchestration.application.swarm.swarm_board_parsers import (
     parse_abort_result,
     parse_board_page_result,
     parse_convergence_result,

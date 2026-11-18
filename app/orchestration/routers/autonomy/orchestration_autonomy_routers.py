@@ -6,10 +6,12 @@ from uuid import UUID
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Query, Request, Response, status
 
-from app.orchestration.application.autonomy_reviewer_app import AutonomyReviewerApplication
-from app.orchestration.application.autonomy_scope_app import AutonomyScopeApplication
-from app.orchestration.application.autonomy_settlement_app import AutonomySettlementApplication
-from app.orchestration.application.autonomy_snapshot_app import AutonomySnapshotApplication
+from app.orchestration.application.autonomy.autonomy_reviewer_app import AutonomyReviewerApplication
+from app.orchestration.application.autonomy.autonomy_scope_app import AutonomyScopeApplication
+from app.orchestration.application.autonomy.autonomy_settlement_app import (
+    AutonomySettlementApplication,
+)
+from app.orchestration.application.autonomy.autonomy_snapshot_app import AutonomySnapshotApplication
 from app.orchestration.exceptions.orchestration_exceptions import (
     ORCHESTRATION_ERROR_RESPONSES,
     OrchestrationBackendErrorResponse,

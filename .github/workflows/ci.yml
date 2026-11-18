@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: heterarchy-systems/heterarchy-forge
-          ref: c850f30ca3eb5ea455ddd613d0cd5456da4422c9
+          ref: ce90b9d144e24350023f623b75558b90fdb58436
           path: heterarchy-forge
           persist-credentials: false
 
@@ -62,7 +62,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: heterarchy-systems/heterarchy-orchestration
-          ref: 56d1d8d459765399fd2640e6478d843de67663ce
+          ref: 46433810daa2009039a7c4daa4fd0d5be75fa425
           path: heterarchy-orchestration
           persist-credentials: false
 
@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: heterarchy-systems/heterarchy-broker
-          ref: 17eb66ad47b284384aee6a77d2945fe09825220d
+          ref: 12f8345ec43d7e02fb1288350e85820f03f9e40f
           path: heterarchy-broker
           persist-credentials: false
 

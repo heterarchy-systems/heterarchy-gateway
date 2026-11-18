@@ -2,6 +2,7 @@
 
 from typing import Annotated, Literal
 
+from fastapi import status
 from pydantic import Field
 
 from app.forge.exceptions.forge_exceptions import ForgeFailureEnvelope
@@ -17,6 +18,14 @@ from app.shared.exception.orchestration_exception import OrchestrationErrorRespo
 from app.shared.ingredient_element.gateway.mixed_enums import (
     MixedBackendEnum,
     MixedDependencyFailureTagEnum,
+)
+from app.shared.types.base_types import JsonObject
+from app.shared.types.http_types import (
+    ContentResponseDefinition,
+    ResponseModel,
+    ResponseModelDefinition,
+    ResponseModels,
+    build_response_models,
 )
 
 
@@ -163,3 +172,119 @@ class MixedRequestContextError(Exception):
         self.location = location
         self.rejected_value = rejected_value
         super().__init__(message)
+
+
+_FASTAPI_VALIDATION_SCHEMA: JsonObject = {
+    "title": "HTTPValidationError",
+    "type": "object",
+    "properties": {
+        "detail": {
+            "title": "Detail",
+            "type": "array",
+            "items": {
+                "title": "ValidationError",
+                "type": "object",
+                "properties": {
+                    "loc": {
+                        "title": "Location",
+                        "type": "array",
+                        "items": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+                    },
+                    "msg": {"title": "Message", "type": "string"},
+                    "type": {"title": "Error Type", "type": "string"},
+                    "input": {},
+                    "ctx": {"title": "Context", "type": "object"},
+                },
+                "required": ["loc", "msg", "type"],
+            },
+        }
+    },
+}
+_VALIDATION_ERROR_CONTENT: JsonObject = {
+    "application/json": {
+        "schema": {
+            "anyOf": [
+                {"$ref": "#/components/schemas/MixedDependencyFailureResponse"},
+                _FASTAPI_VALIDATION_SCHEMA,
+            ]
+        }
+    }
+}
+
+
+def _mixed_error_responses(*, not_found_model: ResponseModel) -> ResponseModels:
+    """Build the shared HTTP error response matrix for Mixed routes.
+
+    Args:
+        not_found_model: Route-specific 404 model contract.
+    Return:
+        Complete status-keyed response catalog for Mixed routes.
+    """
+    result = build_response_models(
+        definitions=(
+            ResponseModelDefinition(
+                status_code=status.HTTP_202_ACCEPTED,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_403_FORBIDDEN,
+                model=MixedDependencyFailureResponse | MixedHttpDetailResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_404_NOT_FOUND,
+                model=not_found_model,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_409_CONFLICT,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                model=MixedDependencyFailureResponse,
+            ),
+            ContentResponseDefinition(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                description="Mixed source rejection or FastAPI request validation error.",
+                content=_VALIDATION_ERROR_CONTENT,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                model=MixedDependencyFailureResponse,
+            ),
+            ResponseModelDefinition(status_code="default", model=MixedDependencyFailureResponse),
+        )
+    )
+    return result
+
+
+MIXED_SWARM_OVERVIEW_RESPONSES: ResponseModels = _mixed_error_responses(
+    not_found_model=MixedDependencyFailureResponse | MixedHttpDetailResponse,
+)
+
+MIXED_DAG_GOVERNANCE_RESPONSES: ResponseModels = _mixed_error_responses(
+    not_found_model=MixedDependencyFailureResponse,
+)

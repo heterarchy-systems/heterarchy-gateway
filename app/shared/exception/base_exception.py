@@ -1,8 +1,4 @@
-"""Shared base exception and error response contract for Gateway BFF."""
-
-from typing import Annotated
-
-from pydantic import Field
+"""Shared base exception contract for Gateway BFF."""
 
 from app.shared.base_schema import BackendReadError
 
@@ -48,12 +44,3 @@ class BaseExcept(Exception):
             retryable=self.retryable,
         )
         return result
-
-
-class GatewayErrorResponse(BackendReadError):
-    """Standard public error response payload."""
-
-    service: Annotated[
-        str | None,
-        Field(description="Upstream service associated with the error, if any."),
-    ]

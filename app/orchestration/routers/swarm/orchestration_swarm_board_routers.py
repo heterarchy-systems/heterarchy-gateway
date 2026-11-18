@@ -5,7 +5,7 @@ from typing import Annotated
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Query, Request, Response, status
 
-from app.orchestration.application.swarm_board_app import (
+from app.orchestration.application.swarm.swarm_board_app import (
     SwarmBoardConvergenceApplication,
     SwarmBoardMessageApplication,
     SwarmBoardVerificationApplication,

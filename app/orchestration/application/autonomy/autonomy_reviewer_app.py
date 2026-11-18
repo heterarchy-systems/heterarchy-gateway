@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import status
 from pydantic import JsonValue
 
-from app.orchestration.application.inner_dto.autonomy_reviewer_inner_dto import (
+from app.orchestration.application.inner_dto.autonomy.autonomy_reviewer_inner_dto import (
     AssignedReviewerDto,
     AssignReviewerCommandDto,
     ExecutionAuthorDto,

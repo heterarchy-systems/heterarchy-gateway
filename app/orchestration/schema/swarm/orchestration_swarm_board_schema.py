@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import AfterValidator, Field, model_validator
 
-from app.orchestration.application.inner_dto.swarm_board_inner_dto import (
+from app.orchestration.application.inner_dto.swarm.swarm_board_inner_dto import (
     AbortSwarmRunCommandDto,
     ConvergeSwarmCommandDto,
     CreateSwarmPanelCommandDto,

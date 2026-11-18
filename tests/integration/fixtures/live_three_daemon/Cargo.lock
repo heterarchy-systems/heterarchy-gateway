@@ -469,6 +469,7 @@ dependencies = [
  "forge-domain",
  "getrandom",
  "rusqlite",
+ "rustix",
  "security-framework",
  "sha2",
  "thiserror",
